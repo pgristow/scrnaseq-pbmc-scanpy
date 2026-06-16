@@ -6,6 +6,10 @@ data/
 .quarto/
 _freeze/
 cache/
+
+# Root-level deliverable render (the servable copy lives in docs/)
+/deliverable.pdf
+deliverable.typ
 .ipynb_checkpoints/
 *_files/
 __pycache__/

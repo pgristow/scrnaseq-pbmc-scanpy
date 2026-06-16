@@ -1,0 +1,62 @@
+---
+title: "Single-cell RNA-seq — Cell-type Report"
+subtitle: "Sample deliverable · 10x pbmc3k"
+author: "Peter Ristow, PhD — Principal Scientist (NGS)"
+date: today
+format:
+  typst:
+    papersize: a4
+    margin:
+      x: 1.8cm
+      y: 1.8cm
+    fontsize: 10pt
+execute:
+  echo: false
+jupyter: python3
+---
+
+```{python}
+import pandas as pd, scanpy as sc, matplotlib.pyplot as plt
+from IPython.display import Markdown
+comp = pd.read_csv("results/celltype_composition.csv")
+adata = sc.read_h5ad("results/pbmc3k_annotated.h5ad")
+n_cells_s = f"{adata.n_obs:,}"
+n_types_s = str(adata.obs["cell_type"].nunique())
+```
+
+**Executive summary.** A raw 10x single-cell matrix was taken end-to-end — quality control,
+normalisation, clustering and **marker-based cell-type annotation** — to a labelled map of the
+immune populations present. **`{python} n_cells_s` quality-controlled cells** resolved into
+**`{python} n_types_s` annotated cell types**, each validated by canonical markers.
+
+### Cell-type composition
+
+```{python}
+_hdr = "| " + " | ".join(comp.columns) + " |"
+_sep = "| " + " | ".join(["---"] * len(comp.columns)) + " |"
+_rows = ["| " + " | ".join(str(v) for v in row) + " |" for row in comp.values]
+Markdown("\n".join([_hdr, _sep, *_rows]))
+```
+
+```{python}
+#| fig-width: 5.4
+#| fig-height: 3.4
+sc.pl.umap(adata, color="cell_type", legend_loc="right margin",
+           title="Annotated PBMC cell types", show=False, size=12)
+plt.tight_layout(); plt.show()
+```
+
+**What this means.** The clusters are *biologically interpretable* — T cells, monocyte subsets, B,
+NK, dendritic and a small megakaryocyte population — not merely statistically distinct. That
+internal consistency is the real quality signal.
+
+**Caveats.** Cluster resolution is a question-driven choice; CD8 T cells sit adjacent to CD4 T at
+this depth and are honestly flagged rather than forced apart. Multi-sample work additionally needs
+doublet detection and batch integration before cross-condition comparison.
+
+**Reproducibility.** The pipeline re-runs from a clean clone in minutes and is verified by
+continuous integration. Code and live report: `github.com/pgristow/scrnaseq-pbmc-scanpy`.
+
+---
+*Prepared by Peter Ristow, PhD — Roche Principal Scientist (NGS). Production engagements use a
+private, hardened pipeline on your data under NDA.*

@@ -11,6 +11,7 @@ A worked, end-to-end single-cell RNA-seq analysis: from a raw 10x Genomics count
 reads as a report for a client and as a pipeline for a reviewer.
 
 ### 👉 [**See the live report**](https://pgristow.github.io/scrnaseq-pbmc-scanpy/)
+### 📄 [**Sample one-page deliverable (PDF)**](https://pgristow.github.io/scrnaseq-pbmc-scanpy/deliverable.pdf) — what lands in your inbox
 
 ---
 
