@@ -1,7 +1,7 @@
 ---
 title: "Single-cell RNA-seq — Cell-type Report"
 subtitle: "Sample deliverable · 10x pbmc3k"
-author: "Peter Ristow, PhD — Principal Scientist (NGS)"
+author: "Peter Ristow, PhD — NGS Bioinformatics"
 date: today
 format:
   typst:
@@ -58,5 +58,5 @@ doublet detection and batch integration before cross-condition comparison.
 continuous integration. Code and live report: `github.com/pgristow/scrnaseq-pbmc-scanpy`.
 
 ---
-*Prepared by Peter Ristow, PhD — Roche Principal Scientist (NGS). Production engagements use a
+*Prepared by Peter Ristow, PhD — NGS bioinformatics specialist. Production engagements use a
 private, hardened pipeline on your data under NDA.*

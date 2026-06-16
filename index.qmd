@@ -1,7 +1,7 @@
 ---
 title: "Single-cell RNA-seq: from raw 10x counts to annotated cell types"
 subtitle: "3k PBMCs — QC → clustering → cell-type annotation, fully reproducible"
-author: "Peter Ristow, PhD — Principal Scientist (NGS)"
+author: "Peter Ristow, PhD — NGS Bioinformatics"
 date: today
 jupyter: python3
 ---
@@ -11,7 +11,7 @@ jupyter: python3
 > proportions, and what genes define them? This report takes the raw count matrix
 > end-to-end to an annotated UMAP — every step reproducible with one command.
 >
-> *Roche Principal Scientist (NGS) & PhD — I turn sequencing data into clean, reproducible answers.*
+> *PhD bioinformatician & NGS specialist — I turn sequencing data into clean, reproducible answers.*
 
 ::: {.callout-note collapse="true"}
 ## How to reproduce this (one command)

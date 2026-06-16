@@ -4,7 +4,7 @@
 [![Live report](https://img.shields.io/badge/live%20report-GitHub%20Pages-2e7d32)](https://pgristow.github.io/scrnaseq-pbmc-scanpy/)
 [![Made with Quarto](https://img.shields.io/badge/made%20with-Quarto-447099)](https://quarto.org)
 
-> **Roche Principal Scientist (NGS) & PhD — I turn sequencing data into clean, reproducible answers.**
+> **PhD bioinformatician & NGS specialist — I turn sequencing data into clean, reproducible answers.**
 
 A worked, end-to-end single-cell RNA-seq analysis: from a raw 10x Genomics count matrix to an
 **annotated, interactive UMAP** of immune cell types — with the full code present but folded, so it
