@@ -1,0 +1,22 @@
+name: sc-pbmc
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - scanpy=1.11
+  - anndata
+  - leidenalg
+  - python-igraph
+  - umap-learn
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - plotly
+  - pandas
+  - numpy
+  - jupyter
+  - ipykernel
+  - nbformat
+  - pooch
+  - quarto

@@ -1,0 +1,21 @@
+# Data (downloaded by scripts/download_data.sh — never committed)
+data/
+!data/.gitkeep
+
+# Quarto / Jupyter scratch
+.quarto/
+_freeze/
+cache/
+.ipynb_checkpoints/
+*_files/
+__pycache__/
+
+# Large analysis outputs are regenerated; keep small CSV summaries only
+results/*.h5ad
+
+# OS
+.DS_Store
+Thumbs.db
+
+/.quarto/
+**/*.quarto_ipynb

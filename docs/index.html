@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Peter Ristow, PhD — Principal Scientist (NGS)">
+<meta name="dcterms.date" content="2026-06-16">
+
+<title>Single-cell RNA-seq: from raw 10x counts to annotated cell types</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="index_files/libs/clipboard/clipboard.min.js"></script>
+<script src="index_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="index_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="index_files/libs/quarto-html/popper.min.js"></script>
+<script src="index_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="index_files/libs/quarto-html/anchor.min.js"></script>
+<link href="index_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="index_files/libs/quarto-html/quarto-syntax-highlighting-de63f62b328812d8e578a4d74e282472.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="index_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="index_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="index_files/libs/bootstrap/bootstrap-d1fb550565cee0b412582e497d148207.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<style>html{ scroll-behavior: smooth; }</style>
+<script src="index_files/libs/quarto-diagram/mermaid.min.js"></script>
+<script src="index_files/libs/quarto-diagram/mermaid-init.js"></script>
+<link href="index_files/libs/quarto-diagram/mermaid.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+<script>
+window.PlotlyConfig = {MathJaxConfig: 'local'};
+if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}
+</script>
+<script type="module">import "https://cdn.plot.ly/plotly-3.6.0.min"</script>
+
+
+
+</head>
+
+<body class="quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article toc-left">
+<div id="quarto-sidebar-toc-left" class="sidebar toc-left">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#the-pipeline-at-a-glance" id="toc-the-pipeline-at-a-glance" class="nav-link active" data-scroll-target="#the-pipeline-at-a-glance">The pipeline at a glance</a></li>
+  <li><a href="#data" id="toc-data" class="nav-link" data-scroll-target="#data">1 · Data</a></li>
+  <li><a href="#quality-control" id="toc-quality-control" class="nav-link" data-scroll-target="#quality-control">2 · Quality control</a></li>
+  <li><a href="#normalization-feature-selection" id="toc-normalization-feature-selection" class="nav-link" data-scroll-target="#normalization-feature-selection">3 · Normalization &amp; feature selection</a></li>
+  <li><a href="#dimensionality-reduction-clustering" id="toc-dimensionality-reduction-clustering" class="nav-link" data-scroll-target="#dimensionality-reduction-clustering">4 · Dimensionality reduction &amp; clustering</a></li>
+  <li><a href="#marker-genes" id="toc-marker-genes" class="nav-link" data-scroll-target="#marker-genes">5 · Marker genes</a></li>
+  <li><a href="#cell-type-annotation-data-driven" id="toc-cell-type-annotation-data-driven" class="nav-link" data-scroll-target="#cell-type-annotation-data-driven">6 · Cell-type annotation (data-driven)</a></li>
+  <li><a href="#interactive-explorer" id="toc-interactive-explorer" class="nav-link" data-scroll-target="#interactive-explorer">7 · Interactive explorer</a></li>
+  <li><a href="#interpretation-caveats" id="toc-interpretation-caveats" class="nav-link" data-scroll-target="#interpretation-caveats">8 · Interpretation &amp; caveats</a></li>
+  <li><a href="#result" id="toc-result" class="nav-link" data-scroll-target="#result">9 · Result</a></li>
+  </ul>
+</nav>
+</div>
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title">Single-cell RNA-seq: from raw 10x counts to annotated cell types</h1><button type="button" class="btn code-tools-button dropdown-toggle" id="quarto-code-tools-menu" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi"></i> Code</button><ul class="dropdown-menu dropdown-menu-end" aria-labelelledby="quarto-code-tools-menu"><li><a id="quarto-show-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Show All Code</a></li><li><a id="quarto-hide-all-code" class="dropdown-item" href="javascript:void(0)" role="button">Hide All Code</a></li><li><hr class="dropdown-divider"></li><li><a id="quarto-view-source" class="dropdown-item" href="javascript:void(0)" role="button">View Source</a></li></ul></div></div>
+<p class="subtitle lead">3k PBMCs — QC → clustering → cell-type annotation, fully reproducible</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Peter Ristow, PhD — Principal Scientist (NGS) </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 16, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<blockquote class="blockquote">
+<p><strong>The question.</strong> A 10x Genomics run gives you a sparse matrix of ~2,700 cells × ~32,000 genes and <em>no labels</em>. Which immune cell types are present, in what proportions, and what genes define them? This report takes the raw count matrix end-to-end to an annotated UMAP — every step reproducible with one command.</p>
+<p><em>Roche Principal Scientist (NGS) &amp; PhD — I turn sequencing data into clean, reproducible answers.</em></p>
+</blockquote>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-1-contents" aria-controls="callout-1" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>How to reproduce this (one command)
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-1" class="callout-1-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/pgristow/scrnaseq-pbmc-scanpy</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> scrnaseq-pbmc-scanpy</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">conda</span> env create <span class="at">-f</span> environment.yml <span class="kw">&amp;&amp;</span> <span class="ex">conda</span> activate sc-pbmc</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> all        <span class="co"># downloads data, runs analysis, renders this report</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Or with Docker: <code>docker build -t scpbmc . &amp;&amp; docker run --rm -v "$PWD":/work scpbmc make all</code>.</p>
+</div>
+</div>
+</div>
+<section id="the-pipeline-at-a-glance" class="level3">
+<h3 class="anchored" data-anchor-id="the-pipeline-at-a-glance">The pipeline at a glance</h3>
+<div class="cell" data-layout-align="default">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode default code-with-copy"><code class="sourceCode default"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    A[Raw 10x matrix&lt;br/&gt;2.7k cells] --&gt; B[QC filter&lt;br/&gt;genes / counts / %mito]</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Normalize + log1p]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Highly variable genes]</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[PCA → neighbours]</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[UMAP embedding]</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    E --&gt; G[Leiden clustering]</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    G --&gt; H[Marker genes&lt;br/&gt;Wilcoxon]</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    H --&gt; I[Cell-type annotation&lt;br/&gt;canonical markers]</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    F --&gt; I</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    I --&gt; J[Annotated .h5ad&lt;br/&gt;+ figures + report]</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    classDef out fill:#e8f5e9,stroke:#2e7d32;</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    class J out;</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output-display">
+<div id="fig-pipeline" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div>
+<pre class="mermaid mermaid-js" data-label="fig-pipeline">flowchart LR
+    A[Raw 10x matrix&lt;br/&gt;2.7k cells] --&gt; B[QC filter&lt;br/&gt;genes / counts / %mito]
+    B --&gt; C[Normalize + log1p]
+    C --&gt; D[Highly variable genes]
+    D --&gt; E[PCA → neighbours]
+    E --&gt; F[UMAP embedding]
+    E --&gt; G[Leiden clustering]
+    G --&gt; H[Marker genes&lt;br/&gt;Wilcoxon]
+    H --&gt; I[Cell-type annotation&lt;br/&gt;canonical markers]
+    F --&gt; I
+    I --&gt; J[Annotated .h5ad&lt;br/&gt;+ figures + report]
+    classDef out fill:#e8f5e9,stroke:#2e7d32;
+    class J out;
+</pre>
+</div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig quarto-uncaptioned" id="fig-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="data" class="level2">
+<h2 class="anchored" data-anchor-id="data">1 · Data</h2>
+<p>The dataset is the canonical <strong>10x Genomics 3k PBMC</strong> sample (peripheral blood mononuclear cells from a healthy donor) — the standard reference for single-cell method validation. We read the raw filtered cell-by-gene matrix.</p>
+<div id="setup" class="cell" data-execution_count="1">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scanpy <span class="im">as</span> sc</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>sc.settings.verbosity <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>sc.settings.set_figure_params(dpi<span class="op">=</span><span class="dv">90</span>, facecolor<span class="op">=</span><span class="st">"white"</span>, frameon<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>plt.rcParams[<span class="st">"figure.figsize"</span>] <span class="op">=</span> (<span class="dv">6</span>, <span class="dv">5</span>)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>Path(<span class="st">"results"</span>).mkdir(exist_ok<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>DATA_DIR <span class="op">=</span> <span class="st">"data/filtered_gene_bc_matrices/hg19/"</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> sc.read_10x_mtx(DATA_DIR, var_names<span class="op">=</span><span class="st">"gene_symbols"</span>, cache<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>adata.var_names_make_unique()</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Loaded </span><span class="sc">{</span>adata<span class="sc">.</span>n_obs<span class="sc">:,}</span><span class="ss"> cells × </span><span class="sc">{</span>adata<span class="sc">.</span>n_vars<span class="sc">:,}</span><span class="ss"> genes"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Loaded 2,700 cells × 32,738 genes</code></pre>
+</div>
+</div>
+</section>
+<section id="quality-control" class="level2">
+<h2 class="anchored" data-anchor-id="quality-control">2 · Quality control</h2>
+<p>Empty droplets, dying cells, and doublets distort every downstream step. We compute standard QC metrics and filter on three intuitive thresholds: a minimum number of detected genes per cell, a maximum (to drop likely doublets), and a ceiling on the mitochondrial fraction (high values flag stressed/dying cells).</p>
+<div id="qc-metrics" class="cell" data-execution_count="2">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>sc.pp.filter_cells(adata, min_genes<span class="op">=</span><span class="dv">200</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>sc.pp.filter_genes(adata, min_cells<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>adata.var[<span class="st">"mt"</span>] <span class="op">=</span> adata.var_names.<span class="bu">str</span>.startswith(<span class="st">"MT-"</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>sc.pp.calculate_qc_metrics(adata, qc_vars<span class="op">=</span>[<span class="st">"mt"</span>], inplace<span class="op">=</span><span class="va">True</span>, percent_top<span class="op">=</span><span class="va">None</span>, log1p<span class="op">=</span><span class="va">False</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+</div>
+<div id="cell-fig-qc-violin" class="cell" data-execution_count="3">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>sc.pl.violin(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    adata, [<span class="st">"n_genes_by_counts"</span>, <span class="st">"total_counts"</span>, <span class="st">"pct_counts_mt"</span>],</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    jitter<span class="op">=</span><span class="fl">0.4</span>, multi_panel<span class="op">=</span><span class="va">True</span>, show<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div id="fig-qc-violin" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-qc-violin-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="index_files/figure-html/fig-qc-violin-output-1.png" width="1352" height="428" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-qc-violin-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: QC distributions before filtering. Each point is a cell.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="qc-filter" class="cell" data-execution_count="4">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>n_before <span class="op">=</span> adata.n_obs</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> adata[adata.obs.n_genes_by_counts <span class="op">&lt;</span> <span class="dv">2500</span>, :].copy()</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> adata[adata.obs.pct_counts_mt <span class="op">&lt;</span> <span class="dv">5</span>, :].copy()</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Kept </span><span class="sc">{</span>adata<span class="sc">.</span>n_obs<span class="sc">:,}</span><span class="ss"> / </span><span class="sc">{</span>n_before<span class="sc">:,}</span><span class="ss"> cells after QC "</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span><span class="dv">100</span><span class="op">*</span>adata<span class="sc">.</span>n_obs<span class="op">/</span>n_before<span class="sc">:.1f}</span><span class="ss">%)."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Kept 2,638 / 2,700 cells after QC (97.7%).</code></pre>
+</div>
+</div>
+</section>
+<section id="normalization-feature-selection" class="level2">
+<h2 class="anchored" data-anchor-id="normalization-feature-selection">3 · Normalization &amp; feature selection</h2>
+<p>Counts are normalized to a common library size, log-transformed, and we keep the most variable genes — the biological signal that separates cell types from technical noise.</p>
+<div id="normalize" class="cell" data-execution_count="5">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>sc.pp.normalize_total(adata, target_sum<span class="op">=</span><span class="fl">1e4</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>sc.pp.log1p(adata)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>adata.raw <span class="op">=</span> adata  <span class="co"># keep full log-normalized matrix for marker plotting/annotation</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>sc.pp.highly_variable_genes(adata, min_mean<span class="op">=</span><span class="fl">0.0125</span>, max_mean<span class="op">=</span><span class="dv">3</span>, min_disp<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>n_hvg <span class="op">=</span> <span class="bu">int</span>(adata.var.highly_variable.<span class="bu">sum</span>())</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> adata[:, adata.var.highly_variable].copy()</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>sc.pp.regress_out(adata, [<span class="st">"total_counts"</span>, <span class="st">"pct_counts_mt"</span>])</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>sc.pp.scale(adata, max_value<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Selected </span><span class="sc">{</span>n_hvg<span class="sc">}</span><span class="ss"> highly variable genes for clustering."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Selected 1838 highly variable genes for clustering.</code></pre>
+</div>
+</div>
+</section>
+<section id="dimensionality-reduction-clustering" class="level2">
+<h2 class="anchored" data-anchor-id="dimensionality-reduction-clustering">4 · Dimensionality reduction &amp; clustering</h2>
+<p>PCA compresses the data; a neighbour graph then drives both the UMAP embedding (for visualization) and Leiden community detection (for clustering).</p>
+<div id="cluster" class="cell" data-execution_count="6">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>sc.tl.pca(adata, svd_solver<span class="op">=</span><span class="st">"arpack"</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>sc.pp.neighbors(adata, n_neighbors<span class="op">=</span><span class="dv">10</span>, n_pcs<span class="op">=</span><span class="dv">40</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>sc.tl.umap(adata)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>sc.tl.leiden(adata, resolution<span class="op">=</span><span class="fl">1.0</span>, flavor<span class="op">=</span><span class="st">"igraph"</span>, n_iterations<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>             directed<span class="op">=</span><span class="va">False</span>, random_state<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Leiden found </span><span class="sc">{</span>adata<span class="sc">.</span>obs<span class="sc">.</span>leiden<span class="sc">.</span>nunique()<span class="sc">}</span><span class="ss"> clusters."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Leiden found 8 clusters.</code></pre>
+</div>
+</div>
+<div id="cell-fig-umap-leiden" class="cell" data-execution_count="7">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>sc.pl.umap(adata, color<span class="op">=</span><span class="st">"leiden"</span>, legend_loc<span class="op">=</span><span class="st">"on data"</span>, title<span class="op">=</span><span class="st">"Leiden clusters"</span>, show<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div id="fig-umap-leiden" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-umap-leiden-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="index_files/figure-html/fig-umap-leiden-output-1.png" width="439" height="380" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-leiden-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: UMAP coloured by unsupervised Leiden cluster.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="marker-genes" class="level2">
+<h2 class="anchored" data-anchor-id="marker-genes">5 · Marker genes</h2>
+<p>For each cluster we rank genes that are over-expressed relative to all other cells (Wilcoxon test). These ranked markers are the evidence base for annotation.</p>
+<div id="cell-rank-genes" class="cell" data-execution_count="8">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>sc.tl.rank_genes_groups(adata, <span class="st">"leiden"</span>, method<span class="op">=</span><span class="st">"wilcoxon"</span>)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>top <span class="op">=</span> sc.get.rank_genes_groups_df(adata, group<span class="op">=</span><span class="va">None</span>).groupby(<span class="st">"group"</span>, observed<span class="op">=</span><span class="va">True</span>).head(<span class="dv">5</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>top.to_csv(<span class="st">"results/top_markers_per_cluster.csv"</span>, index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>top.pivot_table(index<span class="op">=</span><span class="st">"group"</span>, values<span class="op">=</span><span class="st">"names"</span>, aggfunc<span class="op">=</span><span class="kw">lambda</span> s: <span class="st">", "</span>.join(s)).rename(</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>{<span class="st">"names"</span>: <span class="st">"top 5 markers"</span>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div id="rank-genes" class="cell-output cell-output-display" data-execution_count="8">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">top 5 markers</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">group</th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>CCL5, NKG7, B2M, CST7, GZMA</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>RPS12, LDHB, RPS25, RPS27, RPS6</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>CD74, CD79A, HLA-DRA, CD79B, HLA-DPB1</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>LYZ, S100A9, S100A8, TYROBP, FTL</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>NKG7, GNLY, GZMB, CTSW, PRF1</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>LST1, FCER1G, AIF1, COTL1, FCGR3A</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>HLA-DPA1, HLA-DPB1, HLA-DRA, HLA-DRB1, CD74</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">7</th>
+<td>PF4, GNG11, SDPR, PPBP, NRGN</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+</section>
+<section id="cell-type-annotation-data-driven" class="level2">
+<h2 class="anchored" data-anchor-id="cell-type-annotation-data-driven">6 · Cell-type annotation (data-driven)</h2>
+<p>Rather than hand-label cluster numbers (which is fragile), we score each cell against canonical PBMC marker panels and assign every cluster the <strong>best-matching</strong> lineage by mean score. This is reproducible and defensible.</p>
+<div id="cell-annotate" class="cell" data-execution_count="9">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>marker_sets <span class="op">=</span> {</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"CD4 T"</span>:        [<span class="st">"IL7R"</span>, <span class="st">"CD3D"</span>, <span class="st">"CD3E"</span>, <span class="st">"CCR7"</span>],</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"CD8 T"</span>:        [<span class="st">"CD8A"</span>, <span class="st">"CD8B"</span>, <span class="st">"CD3D"</span>],</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"B"</span>:            [<span class="st">"MS4A1"</span>, <span class="st">"CD79A"</span>, <span class="st">"CD79B"</span>],</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"NK"</span>:           [<span class="st">"GNLY"</span>, <span class="st">"NKG7"</span>, <span class="st">"KLRD1"</span>],</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"CD14+ Mono"</span>:   [<span class="st">"CD14"</span>, <span class="st">"LYZ"</span>, <span class="st">"S100A8"</span>],</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"FCGR3A+ Mono"</span>: [<span class="st">"FCGR3A"</span>, <span class="st">"MS4A7"</span>],</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Dendritic"</span>:    [<span class="st">"FCER1A"</span>, <span class="st">"CST3"</span>],</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Megakaryocyte"</span>:[<span class="st">"PPBP"</span>, <span class="st">"PF4"</span>],</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ct, genes <span class="kw">in</span> marker_sets.items():</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>    present <span class="op">=</span> [g <span class="cf">for</span> g <span class="kw">in</span> genes <span class="cf">if</span> g <span class="kw">in</span> adata.raw.var_names]</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    sc.tl.score_genes(adata, present, score_name<span class="op">=</span><span class="ss">f"score_</span><span class="sc">{</span>ct<span class="sc">}</span><span class="ss">"</span>, use_raw<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>score_cols <span class="op">=</span> [<span class="ss">f"score_</span><span class="sc">{</span>ct<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> ct <span class="kw">in</span> marker_sets]</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>cluster_scores <span class="op">=</span> adata.obs.groupby(<span class="st">"leiden"</span>, observed<span class="op">=</span><span class="va">True</span>)[score_cols].mean()</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>assignment <span class="op">=</span> cluster_scores.idxmax(axis<span class="op">=</span><span class="dv">1</span>).<span class="bu">str</span>.replace(<span class="st">"score_"</span>, <span class="st">""</span>, regex<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>adata.obs[<span class="st">"cell_type"</span>] <span class="op">=</span> adata.obs[<span class="st">"leiden"</span>].<span class="bu">map</span>(assignment).astype(<span class="st">"category"</span>)</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>summary <span class="op">=</span> (adata.obs[<span class="st">"cell_type"</span>].value_counts()</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>           .rename_axis(<span class="st">"cell_type"</span>).reset_index(name<span class="op">=</span><span class="st">"n_cells"</span>))</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>summary[<span class="st">"pct"</span>] <span class="op">=</span> (<span class="dv">100</span> <span class="op">*</span> summary[<span class="st">"n_cells"</span>] <span class="op">/</span> summary[<span class="st">"n_cells"</span>].<span class="bu">sum</span>()).<span class="bu">round</span>(<span class="dv">1</span>)</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>summary.to_csv(<span class="st">"results/celltype_composition.csv"</span>, index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>summary</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div id="annotate" class="cell-output cell-output-display" data-execution_count="9">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">cell_type</th>
+<th data-quarto-table-cell-role="th">n_cells</th>
+<th data-quarto-table-cell-role="th">pct</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>CD4 T</td>
+<td>1138</td>
+<td>43.1</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>CD14+ Mono</td>
+<td>486</td>
+<td>18.4</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>NK</td>
+<td>474</td>
+<td>18.0</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>B</td>
+<td>341</td>
+<td>12.9</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>FCGR3A+ Mono</td>
+<td>150</td>
+<td>5.7</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>Dendritic</td>
+<td>36</td>
+<td>1.4</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>Megakaryocyte</td>
+<td>13</td>
+<td>0.5</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="cell-fig-dotplot" class="cell" data-execution_count="10">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>ordered_markers <span class="op">=</span> {ct: [g <span class="cf">for</span> g <span class="kw">in</span> gs <span class="cf">if</span> g <span class="kw">in</span> adata.raw.var_names]</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>                   <span class="cf">for</span> ct, gs <span class="kw">in</span> marker_sets.items()}</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>sc.pl.dotplot(adata, ordered_markers, groupby<span class="op">=</span><span class="st">"cell_type"</span>, use_raw<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>              standard_scale<span class="op">=</span><span class="st">"var"</span>, show<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div id="fig-dotplot" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-dotplot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="index_files/figure-html/fig-dotplot-output-1.png" width="830" height="405" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-dotplot-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Marker expression by annotated cell type — the validation that labels are correct.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+<div id="cell-fig-umap-annotated" class="cell" data-execution_count="11">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>sc.pl.umap(adata, color<span class="op">=</span><span class="st">"cell_type"</span>, legend_loc<span class="op">=</span><span class="st">"right margin"</span>,</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>           title<span class="op">=</span><span class="st">"Annotated PBMC cell types"</span>, show<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div class="cell-output cell-output-display">
+<div id="fig-umap-annotated" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-umap-annotated-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="index_files/figure-html/fig-umap-annotated-output-1.png" width="602" height="380" class="figure-img">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-umap-annotated-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;5: <strong>The headline figure</strong>: UMAP coloured by annotated cell type.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="interactive-explorer" class="level2">
+<h2 class="anchored" data-anchor-id="interactive-explorer">7 · Interactive explorer</h2>
+<p>Static figures are for the paper; an interactive view is for <em>exploration</em>. Hover any cell to read its cluster, type, and depth. (Try the box/lasso select and legend toggles.)</p>
+<div id="cell-fig-plotly" class="cell" data-execution_count="12">
+<details class="code-fold">
+<summary>Show code</summary>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> plotly.express <span class="im">as</span> px</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"UMAP1"</span>: adata.obsm[<span class="st">"X_umap"</span>][:, <span class="dv">0</span>],</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"UMAP2"</span>: adata.obsm[<span class="st">"X_umap"</span>][:, <span class="dv">1</span>],</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cell_type"</span>: adata.obs[<span class="st">"cell_type"</span>].astype(<span class="bu">str</span>).values,</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"leiden"</span>: adata.obs[<span class="st">"leiden"</span>].astype(<span class="bu">str</span>).values,</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"n_genes"</span>: adata.obs[<span class="st">"n_genes_by_counts"</span>].values,</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> px.scatter(</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>    df, x<span class="op">=</span><span class="st">"UMAP1"</span>, y<span class="op">=</span><span class="st">"UMAP2"</span>, color<span class="op">=</span><span class="st">"cell_type"</span>,</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>    hover_data<span class="op">=</span>[<span class="st">"leiden"</span>, <span class="st">"n_genes"</span>],</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="st">"3k PBMCs — interactive UMAP"</span>,</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>    width<span class="op">=</span><span class="dv">820</span>, height<span class="op">=</span><span class="dv">600</span>, opacity<span class="op">=</span><span class="fl">0.8</span>,</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>fig.update_traces(marker<span class="op">=</span><span class="bu">dict</span>(size<span class="op">=</span><span class="dv">4</span>))</span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>fig.update_layout(legend_title_text<span class="op">=</span><span class="st">"Cell type"</span>, template<span class="op">=</span><span class="st">"plotly_white"</span>)</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>fig.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</details>
+<div id="fig-plotly" class="cell-output cell-output-display quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-plotly-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<div style="height:600px; width:820px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.6.0.min.js" integrity="sha256-QaOVwtVY0T02VaHrr6pnoHLCwayMJp4O5n4YyaE3rJk=" crossorigin="anonymous"></script>                <div id="4a610c96-2fe8-44a6-ac07-f3a6b30f0427" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("4a610c96-2fe8-44a6-ac07-f3a6b30f0427")) {                    Plotly.newPlot(                        "4a610c96-2fe8-44a6-ac07-f3a6b30f0427",                        [{"customdata":[["0",779],["4",521],["0",790],["0",532],["0",457],["0",427],["0",785],["4",928],["0",836],["0",1013],["4",654],["4",876],["4",987],["0",732],["4",937],["0",916],["4",857],["0",390],["0",774],["0",855],["4",892],["0",679],["0",667],["4",793],["0",753],["0",637],["4",824],["0",850],["4",667],["0",779],["0",780],["0",603],["4",936],["4",977],["0",798],["4",890],["0",857],["0",719],["4",820],["0",951],["0",1264],["0",918],["0",868],["4",1058],["0",895],["0",831],["0",864],["0",775],["0",805],["0",771],["4",891],["4",890],["0",1033],["4",656],["0",632],["4",598],["0",840],["4",974],["4",985],["0",791],["0",539],["4",1589],["4",980],["0",526],["0",860],["4",828],["0",613],["0",871],["0",857],["0",839],["0",912],["4",872],["4",824],["0",1231],["0",1777],["4",654],["4",916],["0",771],["0",1075],["0",765],["0",782],["4",1055],["0",917],["4",1022],["0",705],["0",819],["4",807],["4",887],["0",770],["0",888],["0",941],["4",825],["4",713],["0",820],["4",929],["0",671],["0",803],["0",872],["0",667],["4",769],["0",762],["4",1378],["0",831],["0",851],["0",603],["0",1078],["4",783],["4",742],["4",833],["0",815],["0",1023],["0",837],["0",457],["4",1002],["0",922],["0",815],["0",706],["0",973],["0",905],["4",923],["0",966],["0",724],["4",904],["4",807],["4",929],["0",515],["4",637],["4",907],["0",1323],["0",1023],["4",604],["0",863],["4",800],["0",653],["4",859],["0",1007],["0",779],["0",828],["0",851],["0",719],["4",957],["4",749],["4",1078],["0",736],["0",1227],["0",997],["0",710],["4",917],["0",1042],["0",894],["0",1610],["0",724],["0",928],["0",908],["0",775],["0",826],["0",709],["0",760],["0",651],["0",418],["0",431],["4",1004],["4",838],["0",824],["0",900],["4",870],["0",710],["4",1047],["0",805],["0",1201],["0",763],["4",1868],["4",770],["4",737],["4",841],["0",738],["0",779],["4",1019],["0",767],["4",1118],["0",728],["0",803],["0",878],["0",659],["0",843],["0",940],["0",444],["0",457],["0",876],["0",772],["0",837],["0",420],["4",813],["0",791],["0",945],["0",903],["4",940],["4",942],["0",1099],["0",727],["0",834],["0",454],["0",752],["0",776],["4",668],["0",2023],["0",869],["0",1102],["0",822],["4",993],["0",670],["0",808],["4",854],["0",889],["0",997],["4",788],["4",778],["0",814],["4",1078],["0",1095],["4",996],["0",931],["0",903],["4",783],["4",950],["4",842],["0",1002],["4",1184],["4",995],["0",553],["0",895],["0",786],["4",1012],["4",1052],["0",907],["4",966],["4",947],["4",842],["4",875],["0",588],["0",1010],["0",738],["0",1264],["0",794],["0",882],["0",348],["0",868],["0",818],["0",717],["0",420],["0",920],["0",855],["4",978],["0",816],["4",796],["0",1489],["0",937],["0",795],["4",815],["4",828],["4",705],["4",915],["0",848],["0",823],["0",482],["4",782],["0",514],["0",923],["0",746],["4",857],["4",997],["0",910],["0",951],["0",849],["4",850],["0",743],["0",743],["4",1050],["0",851],["0",1425],["0",1165],["4",695],["4",969],["4",977],["0",1120],["0",791],["4",943],["0",939],["0",767],["0",850],["0",994],["0",683],["0",778],["0",988],["0",830],["4",809],["0",685],["4",959],["0",1954],["0",749],["4",835],["4",1410],["0",777],["0",601],["0",994],["0",778],["0",857],["0",857],["4",839],["0",817],["0",851],["0",1096],["4",780],["4",906],["0",817],["0",723],["4",1078],["0",488],["4",897],["0",1584],["4",739],["0",771],["4",1494],["0",805],["0",827],["4",975],["0",727],["0",795],["0",902],["0",851],["4",908],["4",734],["0",697],["0",800],["4",693],["4",809],["0",880],["0",970],["4",723],["0",642],["0",856],["4",866],["0",974],["0",800],["0",1426],["0",702],["0",882],["0",1245],["0",668],["0",792],["4",812],["0",675],["0",801],["4",810],["4",1426],["4",905],["4",956],["0",826],["0",536],["4",759],["4",837],["4",1100],["0",1042],["0",970],["0",710],["4",948],["4",913],["4",1667],["0",831],["0",814],["0",701],["4",859],["4",783],["0",1606],["4",993],["4",807],["4",828],["0",786],["0",663],["0",678],["0",426],["4",855],["0",983],["4",1099],["0",702],["0",886],["0",491],["0",753],["0",920],["0",826],["0",891],["4",1037],["4",830],["0",437],["0",703],["0",836],["4",643],["0",879],["0",832],["0",842],["4",915],["4",1457],["0",388],["4",1101],["4",1230],["0",588],["0",882],["0",822],["0",650],["4",932],["0",803],["0",860],["0",736],["0",890],["4",912],["0",740],["4",669],["0",1100],["0",662],["0",581],["0",1128],["4",809],["0",790],["4",540],["0",789],["0",488],["0",940],["0",821],["0",740],["0",937],["0",962],["0",1546],["0",742],["4",940],["0",524],["4",1159],["4",988],["0",866],["0",1019],["4",885],["4",776],["0",695],["0",810],["0",829],["0",471],["0",958],["4",864],["4",723],["4",628],["0",883],["0",590],["0",1226],["0",459],["0",470],["0",992],["0",800],["0",528],["0",735],["4",1155],["0",852],["4",830],["0",883],["4",485],["0",712],["4",805],["0",800],["0",870],["4",814],["4",1179],["0",720],["0",785],["0",1237],["4",1080],["0",691]],"hovertemplate":"cell_type=NK\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"NK","marker":{"color":"#636efa","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"NK","showlegend":true,"x":{"dtype":"f4","bdata":"uX0xwGvug8AOV2vAjW9JwHqDdcA0um\u002fAvPD+v3smGsC2KU7AqehOwMTXXsDHoFHAsDV\u002fwGcmWcC3j3bA4reRwJTnacBQzXXAUZ1\u002fwHClNcAnGE3A5pSKwDdiaMC594TAWsGNwGfggMAiUJbAEqhqwNZtg8BOUZPA0HQ7wHyIXcDuRmrADnEgwNYoe8BKjkjApidswF73UcDATW3AC2wmwCSWM8CDyGrArPdZwPUgicBEaIjAGSVGwGjUFcDHx3rAyrqawNr5GMC\u002f64nA1Od7wFd1TMCzlw3A7\u002fx+wGGPWcCcZorAC9pvwL5MRsAstmbA7YYlwPDsgMDGbmDA44yVwIa5jcDMDGbAYQB4wD3HWMCaz0\u002fAfnRcwIlkgMCTUlHAEL+MwBqFisDI9ZbA1muKwPz9gsBpPW3AsFFfwOc8YsB8tDvAbEtwwOHuiMBr0YHA1PRhwL2Sh8C3cmLAcXZ\u002fwFTQ2b\u002fFZEPAm0mJwHuEi8CJQWvA9HJKwC\u002fMeMC9LVvAxxdTwF9lV8Cd0DzApPE1wMFagsD4AFfAXGhawLCDHcAn\u002fmrAaj58wMCCGMB8rRHAf\u002flKwK+jSsD\u002fjzbAu74xwP0+b8BkzoDAlVVwwBGWjsDt0YPACZpjwNHKRMCY+ILA1U2LwIRxU8BOSIzAOnyEwPstXcBBT0bAQC96wF3mkMBoqZ7AZ9mbwMnRRMArrpTAzplywCxuFsAFyFrAkymGwJiyisCS6VLAMwCBwCExgcDxmjfAHViOwBwsU8CUqILAphq6wDMJKcCJ9mrALSAOwKwTOsCzSnXAg1OYwESvacDSPG\u002fALoV\u002fwDniesAHlo3AHD5LwLZFksA5VHvA8eViwMkSN8BeYY\u002fAlPBGwPFcIcAj0EXAu259wOOSgMB3AIrAfk9MwFiGi8DXE5HA+DJgwMmZgsArcZLAiN9pwFdEeMAluHvA0xmSwAubUcA\u002fzZHAhs2AwLd3QsD3NYPA30AswOLnh8ARMYzAMqeRwM5cKcACfYvAvQUZwEdCicAhKF3ADGWGwOLMQcCP4j3AH7iLwNZvWMCj23TAkQEewELTksDjmo3AtRaRwAaKgcBMnWjAO9uLwEzLlcCM04TAc5w2wKNDYMAkb47Ab+qcwDIZhMDmKIrA6cohwJx0ZsDxTnHAqnKTwCFplsCPJCDATK8VwHSAUsBoaYrAO8MZwBFJLsADWZLALCVGwDpDksACFFzACUU8wFiYX8BxzpXAo1BBwNGQXcAZbWTAGUSNwLs3ksC+CIbAqtthwIROaMCK6YrAupx3wFO0hsCvSRnAbl+DwFrtW8BObuK\u002fYMKSwEqsgsCOtFLAkRRLwCbNhMAaF5nADtxnwHP9OMBt2IrAcF6VwG1ofsAC1FPAlVhowPD1acBOCYDAgm5bwKfsFMAj1EfAFOBOwMXaT8C8fva\u002fWTiTwCK7L8AFwGfAj4h6wPZJasBY2SnA\u002fCNswJnDUMCD+JfAdcMRwP+0isBerYzArJlKwAKGK8CKz5HAxpRxwBeNEMDSpDHAMgghwIqdh8CgAArA0fp7wHnPHcDBv4TAJJ6TwEy4i8A1oS\u002fA9Q91wKoTd8DFvoTAr9JewFrgicB1IjXAnFt4wImNOsDTxGHAukWBwBOal8CD8IzAsHmDwCChlcCMS4\u002fAemsywD6YhMA0MibAY9NZwPIZa8BHGnzActCDwNuTWsD9m4vAHSVawIx+mMCQDZfAcn0VwDVmO8BDNRvA+BFVwNqEDcAEtI3AX5KJwCcgOsBcIQbAUkeHwObalMBkFxrAk7RowKJgDMCtWyTA\u002ft6NwMShX8BFwZDAl9SCwJKoSMAtPW3ACxR2wDCLgcCiiWTAbsV3wPpKXcCcERPAeAuYwA3OesD8Pk3APuGBwItuOsC1n4XAr8BawPUTRcBrflHAu4dGwOdPM8Bn9obAtgNvwPnmdsALvpjASW47wN43dsDbaIHAoAxwwP8Xf8AhtJDAmP9ywKb5ocCFZBbAEqdZwK\u002fTp8DS9JDA+XlMwKGVhcD8\u002f3LASyqQwPkylsAAK4rAELJrwMACIcCHKIHAuzWOwJH\u002fkcB+KBPAiSeRwPIOcsApTYbARL0lwJNvb8BwSY7ASPxgwLu6dsD9eiDAQakRwDWvOMCdPYbAlGk3wM6tVsCh7oHAFO9WwLwEjMDZNFLAT1JpwLdKMcDwGIPAu41mwFh0jcD4RxfAHmQWwHtsiMDtFHXAMv2JwKoUIsBy+WbA3tiSwI9sf8BQno\u002fAS7cawP1GksC9XW\u002fAFZtXwNWkgMAeG1PA+MELwO\u002f1gsAC4BjA4vWCwEGhNMDR0HTAmj59wOBwOsCn+gjAHz9GwNQfhsCBBDLASJUwwKOwXcAtwE7A700IwOq0UMBchIfAySDav4eeDsDt0mLAnwtXwGVlc8B96QTA6zu1v2B4l8BRqWnATYeKwAkCMcAuQ3vA6l2SwPyjNsDtH5PAqV81wL4STMDwsknA8\u002fJpwN1hhcCVnI3ADuaawIHfhMC+P1XAG11zwMfbgMAcEGDAj20ywM1PdMAl6E7A"},"xaxis":"x","y":{"dtype":"f4","bdata":"VbDFQMZoJ0HmHuNAwLnnQGzc+0Bx8e5AJ03HQDiCF0HvufRA1E\u002foQNu1MkEPJjVBjhQuQfXL7EBIRzlB99MUQThmKUF2sAdB37ATQdVb+EDKDjRBGS0DQR7kDEHD4idBDlL7QDHv7kCSATZBe8cIQc\u002fnNUEaexhBMPkBQUUY4ECUIDNBFyYjQbVSDUHNTTBBQs4KQVZP50DvqzdBuZ8EQWi\u002f90BlUwFBAUnsQNTZN0EIrAZBxTrqQGOC6ED+pPZApHIRQWl030DW4jhBG7sfQQDh2UDGbRtBAH3xQAtIHUENKxpBwjoyQSFcMUHyFBNBoZAAQc3eIkFD4zVBVh8AQQ7TAkGbzitBhvHhQFkVC0Ec8ARBpPr4QLA8BEGhCTJBLkAxQSSPDUG8aexAaGMvQUKhJ0Fung9B7Pf6QPC\u002fBEHCcARBY34rQRN5CEH6SjVBnAwCQRA1BUEFpSZBieEsQS+wrUB77glBD+X3QP1mG0Hw9DdBKp72QBeLPkGhJORAZ8AIQZAHAUGPu\u002fhA2JIgQSFJDkHlyClB6qr2QMli5kDShQdBUAALQb3CF0E5KhBBe\u002f40QdBgCEG1bPVAIYsBQQWODkHcuzVBO\u002fLqQLBcEEEZ\u002f\u002ftA75jjQNZoAEF54zdBg9TZQD4L6EDz6zhB7cEwQSaQOUGSDQhB0fcqQanLLkE8ZdpAJbsLQQ0WHkHhPxtBMp4iQWw4wECLrR1BGTMWQc6GGUGCHu9ARTYWQWW96UBhlC1Bn4oiQTRvH0F\u002fOR5BQiqlQDEc30DeDhJBt4AeQSoQ20B1tQxBn7XwQP+7EEHP3xRBZY0XQT0EDUHZ4A9BoNQSQcv2B0GZNgNBqLQEQerw30CxPCpBvMg3QQ6x4UA8HcdAyPgrQcVtCUGabjNBIqDxQMAW2ECc6BpBpSAnQZUVMkFfCidBUK41QQkkGUFyJABBOVA4QSlWBkEo\u002fDBBE4MHQRStCkG\u002fPBdBUGWzQH7\u002fD0GaLRFBfZPlQAfFzECcye5AhowDQcoQDkF4U+tA7t4zQWJu5UDOhAdBxwsNQTOkK0HzdyxBZeTTQFciBUGcYBRBFaoNQRJyGUFk0eNAHCopQVyC60Ao+P5A8igDQQVuAEHcwTNB+RTaQMOwEkGFmyFBRa3uQPlIF0EdYDdBOiwsQR5BD0HHeB1Bhn\u002fHQBvPL0GV6w9BjBXrQFH5EEGHjjVB0og1QYbFG0HHBzRBRdU0QQyz4EAY1RNB127qQCYgLkGhOjxB1wcIQffaL0FC+S1BwwY3QQCYOUHbHxJBmiwUQcdaIEGRD+9AAy74QIpW80CtPMZAd1YTQfVlEUGfJQdBrDnuQCSgGUExl\u002flANMQuQelW2UDUbzJBJxzeQCI+3UAaawJBLXsyQarsMkEptCxBwzA0QYNq6kD\u002fivZAQP7cQF6zNEEYUNNAKCQdQQGo3kCv4iZB10syQXH8BkH4VNBAxa8OQW7EKEEGPhFBg53NQFkXNkEg99VAmD\u002faQO2Z4UCLpDBB2+0zQZB2HEE\u002fVv5AfOz0QGyvMEHbq+NAkIviQNBX9kCatONAlOcVQYyuAUGbgd1AGSQFQcRlL0EKiBlB4L48QV4O\u002fEC1SuxA3H0oQaLxK0EN\u002f\u002f5ANMgKQaCmB0Hl3hRBk07ZQCwUyUARbDJBPtP4QLRXEkGyMf1A55s3QWFBNkHg4eJAJdXoQJeOMUHsdgpBZScqQcLM1EAYxylBRZbvQI6OFEG7WvNA42AAQSWLH0Fv3f5AQnYYQQOI2UDHKNxAO2kvQW9qI0HDxN9ALujcQPt5IUHmdhNBeUkTQTQcDUFqBB9BtcEGQfCt9kB5VChB3KsbQVZpAEGM791AmNQCQTN+8kB+RvlAs80dQY3yAkGChDhBCnTsQL7oC0Ez2CVBHTMYQdz2E0GsHjdBOGHLQJwj8EDyFDNBcc4lQRKdN0ED8txAPUMFQQZWBUF4OjZBtAAoQdoYOEGPuuhAw1rwQB+Q1kB3OxZBTswtQVE\u002fz0AcqCdB9B8sQZr9O0EUJQNBd2rbQBp+HUE2ZQJBSx4pQc\u002fNAUHVpy9Bwj3hQLDKCkEpiPFAB0XZQAwuEEFU2R5BDEwBQcb0O0FG+TBBNuluQLvaA0E07+dAAVobQX8T4EC3GRNBBSrzQFsmLUGsUzBBQuACQQL8JEE0DzZBpFIXQaqH6kAQPNlAVVkFQRO+OkE+PPhAftD8QJb3\u002fkB0LxxBVHY8QbXS8EDycyVBK+sZQY\u002fnEEG3qgZBYJ\u002f4QAa4NEGWIPhAck8fQfRkGkEr6\u002f5AKPi6QIZQCkGITfhAYdwJQV\u002f7yUB5DtZAhc3xQDn8K0ENu\u002fRA6TQvQUX7LUHNdedAGCcEQUKKNUEgQSdBi6LeQD+a+UB\u002fjRRB1MFuQBfc5kDBpChBGwM3QVd9IkHnA+1ASZ+1QP7pCUHBLxNBwhrvQNJ9AkGlqhZBJKIRQeZS\u002fUCRIzRBCgYEQT7nNkErCwBBtEwtQQvRBkFFcy9B7mYVQbPCHkF7jTdBAuc6QbTWCEGsTfdAf5vSQAfBMUEVYvVA"},"yaxis":"y","type":"scattergl"},{"customdata":[["2",1352],["2",1112],["2",1445],["2",444],["2",1015],["2",787],["2",406],["2",823],["2",740],["2",899],["2",660],["2",563],["2",567],["2",412],["2",899],["2",1713],["2",600],["2",640],["2",341],["2",603],["2",609],["2",960],["2",1031],["2",888],["2",872],["2",958],["2",676],["2",774],["2",656],["2",577],["2",734],["2",756],["2",643],["2",666],["2",581],["2",487],["2",768],["2",490],["2",1852],["2",823],["2",543],["2",1186],["2",690],["2",881],["2",639],["2",769],["2",649],["2",743],["2",616],["2",475],["2",750],["2",1029],["2",1310],["2",646],["2",803],["2",569],["2",490],["2",671],["2",507],["2",569],["2",1035],["2",695],["2",867],["2",722],["2",642],["2",681],["2",581],["2",763],["2",659],["2",843],["2",492],["2",780],["2",503],["2",653],["2",978],["2",623],["2",569],["2",529],["2",522],["2",889],["2",733],["2",1029],["2",358],["2",770],["2",813],["2",634],["2",770],["2",348],["2",715],["2",696],["2",743],["2",381],["2",384],["2",645],["2",618],["2",600],["2",893],["2",603],["2",794],["2",662],["2",617],["2",836],["2",966],["2",389],["2",826],["2",576],["2",900],["2",679],["2",831],["2",600],["2",723],["2",740],["2",690],["2",607],["2",689],["2",554],["2",889],["2",674],["2",720],["2",863],["2",545],["2",1996],["2",643],["2",800],["2",992],["2",723],["2",615],["2",676],["2",827],["2",394],["2",578],["2",712],["2",779],["2",834],["2",391],["2",544],["2",524],["2",604],["2",752],["2",703],["2",924],["2",946],["2",726],["2",808],["2",566],["2",727],["2",816],["2",793],["2",810],["2",545],["2",666],["2",739],["2",683],["2",731],["2",618],["2",810],["2",648],["2",598],["2",728],["2",326],["2",554],["2",563],["2",772],["2",723],["2",1033],["2",761],["2",599],["2",909],["2",452],["2",548],["2",1741],["2",762],["2",843],["2",1481],["2",891],["2",650],["2",417],["2",627],["2",851],["2",681],["2",784],["2",496],["2",738],["2",701],["2",647],["2",779],["2",975],["2",661],["2",1021],["2",714],["2",570],["2",787],["2",776],["2",552],["2",633],["2",595],["2",371],["2",592],["2",738],["2",473],["2",640],["2",634],["2",554],["2",612],["2",712],["2",604],["2",1155],["2",714],["2",640],["2",1193],["2",637],["2",376],["2",618],["2",334],["2",637],["2",539],["2",337],["2",641],["2",1674],["2",585],["2",594],["2",814],["2",931],["2",541],["2",1135],["2",644],["2",474],["2",795],["2",691],["2",669],["2",503],["2",773],["2",840],["2",653],["2",670],["2",561],["2",728],["2",679],["2",772],["2",781],["2",519],["2",651],["2",641],["2",663],["2",1374],["2",502],["2",493],["2",623],["2",815],["2",1202],["2",646],["2",911],["2",654],["2",1121],["2",717],["2",782],["2",374],["2",656],["2",652],["2",714],["2",593],["2",739],["2",491],["2",792],["2",680],["2",1650],["2",609],["2",645],["2",620],["2",659],["2",676],["2",530],["2",597],["2",543],["2",708],["2",709],["2",730],["2",839],["2",953],["2",608],["2",681],["2",363],["2",530],["2",632],["2",846],["2",703],["2",596],["2",815],["2",702],["2",657],["2",748],["2",367],["2",616],["2",823],["2",606],["2",719],["2",643],["2",606],["2",562],["2",515],["2",638],["2",670],["2",856],["2",626],["2",938],["2",795],["2",779],["2",629],["2",714],["2",563],["2",926],["2",703],["2",511],["2",531],["2",619],["2",638],["2",647],["2",656],["2",915],["2",952],["2",665],["2",636],["2",787],["2",804],["2",624],["2",950],["2",881],["2",656],["2",752],["2",602],["2",738],["2",615],["2",721],["2",570],["2",805],["2",820],["2",698],["2",636],["2",1224],["2",622],["2",452]],"hovertemplate":"cell_type=B\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"B","marker":{"color":"#EF553B","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"B","showlegend":true,"x":{"dtype":"f4","bdata":"z8RKQDR+UUD1gF5AXV2aQNWQbECfQF5Acqp8QAS7mkB9A4RArrRwQBUyjkALzaFAB1CXQDH7j0B0tVdAfctNQHXTlUAt+YpA2uR7QAnJlECS6olAhLaBQBDie0DrqYlAmq+OQNZ8sUDumJRA\u002ffepQOdxg0CUq5RAoB2hQL\u002fdhEB09KNA8FmLQKvEeEDtmYhA8QldQAIAiUAe0j1ApKtuQMUqo0AyIG9AuHykQH3EhUBDHJJAgrCrQEnVkkCOkKRA\u002ffhkQJx+hkDzLbdApfxJQCYWYkA2CZNAHlp+QHycfkBBQp5AUwKLQPP5lkAP\u002fodAK9xUQJenskBvAmRAxJadQMApoECr9lFAZyCeQBw5g0BJ95NATVBkQC3Gm0CHPmpACCxpQL4To0A5l5hAE2WqQGbIokCJ6J1Arh6VQEfUg0D0TY9AEKd4QDHqmkCLeK5AUNyTQMjChECeC6FAwGmkQI+KrUCqB7ZAd2mdQDYaokC9S2VARiuWQJ6AuUBm7H9Al7JnQJ8pskD701RA0A+dQIZKmEDniIpAiIKGQOb\u002fl0A95oBAHgOCQFqaoEADEptAcnWVQMavikCgMJZAvTGKQIFHrUAYAbVAQ2iDQBKXd0CGo5NAwqSGQCoqe0DnC7dABnuIQOvIP0BmNp1A8\u002faTQKZyhUCunbNAa6uMQHJ2h0CHK6xA99CNQD0Dh0A0fIxAFEaHQIzAq0AVZWJAW06mQEU1skB1zIBA0NGgQKhSpkCfMopA2DlxQMb1oUDJoZhA3bGIQPV2hEDxpKRAD3RwQPZ4p0BilKNAbtWaQKwAj0Dj\u002fWBApqdOQMsFmUDhEXNAtty3QFVLe0A0OINARaxdQNsXpkCGE55AnXB\u002fQMrwp0BYeHhA0l9eQJ7hjkC5sJVAmXmQQE0GoEA69lRA5T9lQPVWgUBdZ0JAikC4QLR2qUDC\u002fUVAsEOgQEc\u002fUUAqfppAwxSYQNpfZUDxcqJAnvGoQM5ff0DEj59AJYReQJWypEAE2qpAjKibQHHpj0CjN0tA6aCUQPWOU0D03FlAmXOZQKx5gEAbDItAEDCdQBkvcUAfIK5AwNyTQIoooUArTnhAcEugQFdehUCDa5xA6mWXQBlrekAoJatATP+qQG0QpUDcKYJAACEmQFp3l0CJPYxAIaV+QJd\u002fTUAc+ltA\u002fiCJQHeHd0CxlYRAZDtLQPcCZ0C3gYdAjj+0QDBoikB3959AXgKHQPf\u002fdkCzz3dAnamSQBQwi0DtkJtADk6iQFzwhUDotIBA4X+kQCX7nkD1ZWJA86GZQIZxg0DPNohA8uM5QEifkUAMOo1AXNVzQPe3kECg56FAHoWMQEovjEBMs4NACGmnQJiDQkD2bZ5AlSRuQB06nECMZHFA82KkQIsuZEA98ZZAhamqQKADgEDjy5RAW7mrQMGxU0A8EnRAkmOgQCf4jUB0l5NAuZ2DQHzTrEBVQ5lAHpWFQBkwk0CcmKZA7hmZQBpxU0CB8W1AD4OWQNjJZUBlUVJAR4+jQBPzjUAiH65A\u002fuSTQAh3oEAyYHZA52F7QMQErEDvuo9ArzaDQNFskkDTmKtAuZWbQDeYnEB3tY5Aw5aoQEp6kEDxs4FAtEB\u002fQOAYnUA2K5pAV0iaQORugUCn6JtAFziHQI+emECrRF1AOfWoQJpzpUBOKZNAzcyYQOCkfkB5m61A2+KNQMwYjUDXTIpA07KMQPF1g0A1qJpAX3+eQKdjWkDHZXlAgO14QIk\u002fZUCSoalAcIeRQPMvk0BKJrRAVBunQDMFpUBNB3tAb\u002fiJQN0aoEAZU1xAvs6HQKT+jUDelE5A4zCdQK4OrEA="},"xaxis":"x","y":{"dtype":"f4","bdata":"WZSBvce0m76Flsa92TTPPwuIXry4rS4\u002fRV\u002f3Piu\u002f1T1+trm+jG7Tvo7fhz1doxk9bBCUPGlJwr7Ky7a+cufWvTjxlj4Na0Y\u002fwk9wPXKMET8HiEg+3gLHPvku+b6tGXm+qDV\u002fPqfGND84OoU\u002fzen6Pv6zyD8Y5E08RHWrPkSqgD9r+Os+z5o6PmVirD7IGIo\u002fSoyJvX68GT\u002fooLS+6s9QP+NxBr\u002fFm9I+5nvGPjZwHr\u002fsAPU+hUhnPw3rsr5snA+\u002fBXF4P499wz+V0HG8MxwiPkHcDT+3FBK+ZHKIPoVIPD4VaJ0\u002fTzx2P4Vl2j8R\u002fCs\u002fGmuqPjeE8j2Sp4E9mLqLPn+fmz+qplM+0SeBP6o4jz+rrZs+xqakvqRBYT+hexo\u002feBhCP3ckNz+gmak9q8ooPtvhnD9pAeq7oQ2kPxQWBr9ydGM\u002fEidXvqN8uD\u002fWJ5w+hp7\u002fvofWBz5zlFS+GxOxP4PkDD\u002fdGEY\u002fhxXePhjDpT9d7Ko\u002fQdsUP8LmBD\u002feUeU+JBgIP70GVD+qYo8\u002fP\u002fTBPrGmiz94xgO\u002fyi5NPnlYrz+rfMA+1oToPrgRHL9WNrA\u002ftitfPtvxPj9rFWK9TjJpPwSfYj\u002f6ZJY+I+4fvjkGJD9Y4Cy\u002fmPPpPa4XZjoYg7w+I5esPtNdmb55X5E\u002fl0T9vpB2Hj5tosw+P5GHPllOHD9xkBM\u002fG7THvgORtz\u002fxoSW+VqsCP5RU6D0ocIU\u002fbpNqP9HA5D6\u002fjuk+wZRCvv\u002fhPT\u002fyMBW\u002fjWgsPp12Z76wvRk9wsqJPxJnhj9\u002fMKo+TYtqP2GwSD9szm4\u002fT2b\u002fPkGRWz+ToaO9z+KcPT32ij+T\u002fLg9xQelPvmOjD8TGcc+jSzDPzXcaz\u002fgpqA++Cx9PiGfgz\u002f\u002f6D++EqYtP+26pz4Pdvi9sUtyP5fKuT84jSS\u002fUkmzP+AehT9OcrA+wj7jvLpI77xeqNE\u002fpWdRPvuWkz6epJc+Z8a8vAfDED+UTcI+erjgvGvDRr5NG+e9X9c7P15Ee7uNs8K+iEFTPshfwT8BmSQ\u002fQuAZP\u002f6Phz8MQBU\u002fuIudvsYJuT\u002fAP\u002fY506favg\u002fanj7YFkE\u002f4ZnyPqanqj9cyYI\u002fLwmBPQHt1L6RwIE\u002fZG0EP60GOD8BDQm\u002fuLFcP+wlmD8fFUk\u002fal3XPz\u002fAsz9KNr0\u002fjN2qPwp4jj8pNW8\u002fzqhYPwdanT+WydQ+bJi1P+Mz2T+HoWI9w3InP14pEz+mMBi\u002f9VEhP1uOIr8w1rg\u002f6bW2vZP2ZT98SxS\u002f9v5eP\u002f\u002fhYz9bmBm\u002fKDIXP\u002fqrGr+GSEc7A4mcP3VFa776+tY\u002f7qeuPx0iY7\u002fphtA\u002fPOJVP2rXgj+5NNK+i+xRv2DirD6YeIE+R4ftvv\u002fbHj+gC2g+l0KIP67X5j9SFDc90Am+P7bBPL49CYY\u002fiUm9PmAGnD+HthQ+ahs5vkwtSL9J2Mc+fB46P7+pnD9iWBQ\u002f86Zvvqf7sD5v8tc+xnCcP4ocyT+J7hM\u002fIKcevqbIHD+YIYa8SnGZP6VqAT8+wZU\u002fgGt3PyPaqb4kywM\u002fNJravmPqeT\u002f9v3M\u002fYPZkPveZBj9SHlM\u002fxvK4P\u002fsbED9RVs++7ptsP\u002fCdsL7AmrI\u002fSGJNP5Yflz+DUas\u002fWwGnvSjsQT9HrXQ\u002fsEabP6H0rD+fdUW\u002frRUSv\u002fvFgz+WF0c\u002fx\u002fqWP9VmNj+EqZs\u002fQTLCP2xt175U6Y8+pgc2PyOBXj4cVKU9UVLwvlRgUT1NYRU\u002fb8PSP2kzgT\u002fZVPW9Y3GtP81cPj9U3Qw\u002fK9wxvsO\u002f+T57Rgk\u002fkSRkP6FpiT8CobG+3+6wPbvYt71mMy8\u002fu5lFv5YTgL4zzxC\u002fbCqLP0h1pL4="},"yaxis":"y","type":"scattergl"},{"customdata":[["1",1129],["1",781],["1",782],["1",747],["1",864],["1",335],["1",1013],["1",417],["1",508],["1",823],["1",996],["1",936],["1",749],["1",873],["1",731],["1",877],["1",782],["1",785],["1",788],["1",800],["1",756],["1",835],["1",1237],["1",843],["1",825],["1",764],["1",789],["1",868],["1",803],["1",963],["1",799],["1",690],["1",906],["1",620],["1",866],["1",914],["1",789],["1",674],["1",397],["1",785],["1",700],["1",898],["1",819],["1",790],["1",477],["1",768],["1",866],["1",648],["1",830],["1",387],["1",933],["1",604],["1",1007],["1",980],["1",1030],["1",886],["1",601],["1",1118],["1",776],["1",743],["1",857],["1",923],["1",804],["1",715],["1",803],["1",554],["1",782],["1",978],["1",909],["1",935],["1",960],["1",798],["1",1110],["1",624],["1",778],["1",431],["1",849],["1",680],["1",797],["1",830],["1",846],["1",488],["1",418],["1",791],["1",769],["1",955],["1",679],["1",524],["1",904],["1",505],["1",849],["1",793],["1",747],["1",951],["1",827],["1",969],["1",1109],["1",648],["1",1022],["1",390],["1",836],["1",840],["1",747],["1",735],["1",795],["1",894],["1",686],["1",601],["1",354],["1",700],["1",736],["1",888],["1",818],["1",977],["1",741],["1",560],["1",844],["1",815],["1",768],["1",1012],["1",926],["1",794],["1",751],["1",365],["1",946],["1",771],["1",823],["1",836],["1",640],["1",815],["1",865],["1",761],["1",717],["1",774],["1",835],["1",669],["1",942],["1",792],["1",1043],["1",793],["1",821],["1",1141],["1",470],["1",1739],["1",888],["1",605],["1",716],["1",927],["1",718],["1",749],["1",455],["1",755],["1",867],["1",960],["1",624],["1",1088],["1",966],["1",478],["1",808],["1",1007],["1",805],["1",962],["1",676],["1",884],["1",587],["1",876],["1",923],["1",782],["1",929],["1",944],["1",599],["1",880],["1",975],["1",756],["1",772],["1",979],["1",854],["1",1146],["1",741],["1",914],["1",967],["1",704],["1",919],["1",803],["1",540],["1",519],["1",1090],["1",762],["1",698],["1",749],["1",898],["1",757],["1",881],["1",808],["1",1703],["1",786],["1",638],["1",816],["1",805],["1",807],["1",977],["1",886],["1",725],["1",1187],["1",814],["1",806],["1",864],["1",463],["1",663],["1",860],["1",464],["1",788],["1",781],["1",749],["1",788],["1",431],["1",801],["1",944],["1",766],["1",776],["1",967],["1",986],["1",882],["1",625],["1",1168],["1",491],["1",924],["1",581],["1",842],["1",595],["1",811],["1",754],["1",872],["1",558],["1",948],["1",946],["1",904],["1",841],["1",606],["1",666],["1",726],["1",940],["1",653],["1",1010],["1",986],["1",591],["1",1039],["1",813],["1",775],["1",819],["1",735],["1",943],["1",638],["1",922],["1",934],["1",786],["1",701],["1",692],["1",780],["1",838],["1",529],["1",728],["1",800],["1",852],["1",744],["1",542],["1",696],["1",872],["1",1150],["1",1026],["1",479],["1",727],["1",907],["1",832],["1",899],["1",753],["1",901],["1",952],["1",869],["1",550],["1",689],["1",947],["1",878],["1",246],["1",855],["1",976],["1",964],["1",907],["1",415],["1",657],["1",935],["1",722],["1",1034],["1",852],["1",1399],["1",760],["1",740],["1",687],["1",650],["1",681],["1",820],["1",803],["1",846],["1",769],["1",948],["1",999],["1",960],["1",812],["1",791],["1",1040],["1",672],["1",936],["1",498],["1",948],["1",847],["1",739],["1",1074],["1",623],["1",1006],["1",907],["1",814],["1",749],["1",1038],["1",630],["1",755],["1",850],["1",850],["1",796],["1",860],["1",862],["1",808],["1",885],["1",918],["1",853],["1",806],["1",985],["1",677],["1",830],["1",547],["1",722],["1",656],["1",770],["1",1262],["1",660],["1",805],["1",862],["1",1002],["1",760],["1",910],["1",625],["1",869],["1",794],["1",834],["1",402],["1",753],["1",696],["1",637],["1",666],["1",844],["1",1035],["1",1026],["1",889],["1",989],["1",722],["1",745],["1",333],["1",873],["1",861],["1",657],["1",753],["1",378],["1",924],["1",777],["1",967],["1",385],["1",767],["1",729],["1",943],["1",831],["1",723],["1",745],["1",870],["1",862],["1",934],["1",843],["1",782],["1",833],["1",838],["1",698],["1",663],["1",576],["1",879],["1",685],["1",886],["1",872],["1",766],["1",972],["1",574],["1",810],["1",884],["1",787],["1",1025],["1",968],["1",357],["1",623],["1",797],["1",830],["1",616],["1",647],["1",999],["1",616],["1",733],["1",1934],["1",856],["1",942],["1",983],["1",993],["1",847],["1",983],["1",970],["1",789],["1",493],["1",740],["1",941],["1",934],["1",818],["1",1186],["1",823],["1",637],["1",827],["1",608],["1",680],["1",914],["1",733],["1",1008],["1",744],["1",670],["1",837],["1",875],["1",938],["1",760],["1",732],["1",750],["1",689],["1",927],["1",816],["1",559],["1",1074],["1",689],["1",865],["1",770],["1",1104],["1",841],["1",785],["1",874],["1",797],["1",744],["1",797],["1",943],["1",925],["1",660],["1",843],["1",1136],["1",524],["1",523],["1",855],["1",714],["1",763],["1",832],["1",674],["1",834],["1",874],["1",679],["1",785],["1",819],["1",647],["1",923],["1",699],["1",816],["1",592],["1",859],["1",774],["1",687],["1",922],["1",801],["1",867],["1",945],["1",767],["1",700],["1",691],["1",422],["1",774],["1",500],["1",616],["1",812],["1",767],["1",1053],["1",913],["1",449],["1",430],["1",926],["1",559],["1",962],["1",1338],["1",427],["1",806],["1",820],["1",594],["1",680],["1",1030],["1",849],["1",879],["1",447],["1",865],["1",938],["1",1053],["1",852],["1",737],["1",803],["1",1006],["1",798],["1",785],["1",833],["1",1040],["1",858],["1",867],["1",845],["1",686],["1",724],["1",660],["1",469],["1",808],["1",397],["1",784],["1",878],["1",823],["1",823],["1",740],["1",878],["1",1063],["1",742],["1",805],["1",1119],["1",1022],["1",804],["1",674],["1",828],["1",763],["1",866],["1",927],["1",956],["1",892],["1",494],["1",708],["1",794],["1",888],["1",872],["1",869],["1",769],["1",805],["1",1425],["1",894],["1",426],["1",239],["1",923],["1",851],["1",1150],["1",731],["1",897],["1",712],["1",850],["1",861],["1",839],["1",1520],["1",660],["1",910],["1",1060],["1",679],["1",995],["1",693],["1",925],["1",574],["1",1051],["1",669],["1",956],["1",863],["1",895],["1",643],["1",819],["1",549],["1",1112],["1",725],["1",898],["1",869],["1",515],["1",751],["1",740],["1",796],["1",797],["1",651],["1",986],["1",723],["1",952],["1",712],["1",955],["1",876],["1",823],["1",1076],["1",691],["1",771],["1",807],["1",952],["1",814],["1",760],["1",842],["1",624],["1",836],["1",722],["1",436],["1",723],["1",696],["1",885],["1",807],["1",423],["1",729],["1",854],["1",627],["1",823],["1",1061],["1",573],["1",743],["1",542],["1",731],["1",881],["1",981],["1",573],["1",521],["1",662],["1",792],["1",972],["1",590],["1",902],["1",694],["1",974],["1",816],["1",751],["1",789],["1",858],["1",813],["1",841],["1",1080],["1",716],["1",955],["1",295],["1",917],["1",840],["1",674],["1",380],["1",878],["1",725],["1",718],["1",837],["1",802],["1",1082],["1",973],["1",646],["1",881],["1",950],["1",732],["1",782],["1",753],["1",716],["1",887],["1",808],["1",795],["1",911],["1",529],["1",846],["1",628],["1",1118],["1",755],["1",1175],["1",849],["1",937],["1",1138],["1",906],["1",839],["1",803],["1",714],["1",867],["1",714],["1",855],["1",784],["1",809],["1",1750],["1",840],["1",672],["1",954],["1",795],["1",719],["1",578],["1",593],["1",388],["1",751],["1",829],["1",1185],["1",816],["1",744],["1",800],["1",795],["1",979],["1",1095],["1",827],["1",954],["1",1059],["1",695],["1",786],["1",892],["1",764],["1",786],["1",889],["1",782],["1",920],["1",845],["1",1010],["1",838],["1",584],["1",878],["1",779],["1",808],["1",1087],["1",804],["1",853],["1",836],["1",923],["1",861],["1",889],["1",983],["1",510],["1",939],["1",1236],["1",580],["1",972],["1",824],["1",919],["1",913],["1",619],["1",750],["1",910],["1",775],["1",659],["1",762],["1",767],["1",673],["1",761],["1",725],["1",871],["1",1043],["1",680],["1",595],["1",749],["1",735],["1",887],["1",782],["1",642],["1",828],["1",821],["1",716],["1",800],["1",570],["1",827],["1",719],["1",800],["1",885],["1",631],["1",755],["1",550],["1",765],["1",776],["1",857],["1",746],["1",778],["1",687],["1",805],["1",796],["1",964],["1",782],["1",1016],["1",965],["1",434],["1",998],["1",795],["1",944],["1",595],["1",719],["1",836],["1",844],["1",707],["1",794],["1",877],["1",642],["1",1305],["1",908],["1",708],["1",840],["1",945],["1",823],["1",994],["1",572],["1",792],["1",753],["1",770],["1",852],["1",934],["1",1046],["1",618],["1",735],["1",867],["1",913],["1",994],["1",426],["1",945],["1",723],["1",380],["1",714],["1",930],["1",971],["1",904],["1",952],["1",470],["1",820],["1",713],["1",726],["1",771],["1",854],["1",759],["1",749],["1",837],["1",797],["1",453],["1",733],["1",604],["1",803],["1",858],["1",1018],["1",1221],["1",1286],["1",752],["1",887],["1",1079],["1",674],["1",909],["1",800],["1",539],["1",941],["1",733],["1",991],["1",844],["1",783],["1",794],["1",827],["1",766],["1",643],["1",756],["1",787],["1",730],["1",810],["1",858],["1",743],["1",623],["1",1013],["1",584],["1",690],["1",1175],["1",764],["1",742],["1",905],["1",955],["1",765],["1",935],["1",942],["1",568],["1",693],["1",530],["1",1815],["1",941],["1",694],["1",658],["1",975],["1",832],["1",689],["1",919],["1",764],["1",552],["1",785],["1",810],["1",861],["1",371],["1",845],["1",1070],["1",853],["1",758],["1",616],["1",876],["1",948],["1",965],["1",789],["1",912],["1",863],["1",795],["1",905],["1",713],["1",867],["1",817],["1",1045],["1",744],["1",865],["1",1182],["1",539],["1",838],["1",925],["1",732],["1",967],["1",620],["1",604],["1",621],["1",900],["1",853],["1",989],["1",858],["1",603],["1",766],["1",927],["1",805],["1",513],["1",878],["1",993],["1",356],["1",801],["1",843],["1",603],["1",881],["1",1126],["1",791],["1",789],["1",588],["1",928],["1",690],["1",840],["1",522],["1",720],["1",641],["1",995],["1",606],["1",944],["1",995],["1",837],["1",827],["1",815],["1",842],["1",1199],["1",849],["1",1157],["1",705],["1",989],["1",270],["1",443],["1",813],["1",622],["1",822],["1",780],["1",848],["1",407],["1",927],["1",652],["1",705],["1",789],["1",532],["1",627],["1",781],["1",617],["1",661],["1",946],["1",490],["1",823],["1",611],["1",884],["1",645],["1",824],["1",723],["1",840],["1",1005],["1",952],["1",827],["1",750],["1",1031],["1",858],["1",893],["1",747],["1",855],["1",914],["1",381],["1",1076],["1",857],["1",821],["1",833],["1",1289],["1",792],["1",836],["1",765],["1",814],["1",663],["1",873],["1",1566],["1",688],["1",1075],["1",782],["1",838],["1",806],["1",770],["1",781],["1",748],["1",779],["1",750],["1",871],["1",697],["1",705],["1",606],["1",1646],["1",1088],["1",667],["1",615],["1",1191],["1",1018],["1",757],["1",854],["1",1026],["1",846],["1",865],["1",751],["1",795],["1",793],["1",973],["1",935],["1",659],["1",925],["1",718],["1",598],["1",975],["1",1018],["1",813],["1",933],["1",943],["1",789],["1",898],["1",690],["1",843],["1",900],["1",879],["1",1042],["1",565],["1",725],["1",1177],["1",660],["1",835],["1",388],["1",964],["1",1087],["1",900],["1",789],["1",701],["1",817],["1",790],["1",904],["1",871],["1",1099],["1",852],["1",1255],["1",817],["1",683],["1",883],["1",656],["1",816],["1",582],["1",821],["1",805],["1",815],["1",1305],["1",588],["1",1153],["1",879],["1",642],["1",285],["1",825],["1",718],["1",971],["1",1017],["1",643],["1",546],["1",1100],["1",847],["1",914],["1",816],["1",827],["1",880],["1",368],["1",784],["1",927],["1",1377],["1",732],["1",464],["1",945],["1",646],["1",437],["1",550],["1",927],["1",757],["1",707],["1",880],["1",803],["1",865],["1",945],["1",1068],["1",843],["1",1049],["1",709],["1",734],["1",712],["1",810],["1",652],["1",857],["1",750],["1",859],["1",931],["1",885],["1",720],["1",873],["1",723]],"hovertemplate":"cell_type=CD4 T\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"CD4 T","marker":{"color":"#00cc96","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"CD4 T","showlegend":true,"x":{"dtype":"f4","bdata":"ptsHwPy7GcDrfHjAC7yUwBCwM8Dv7hXAQ5RowO6OFcCUJ0jAj4mywDS3tMBia7m\u002fgvWawL8SrsCK3zTAyfGCwEiCJMAqESDALkeSwN3fpMD5lqnAb324wKqfm8BrpIjADGqTwI6BlMA97vm\u002fIrIiwGHxr8CMtabAXjwuwAQxAMDBCp7A0atTwAd6DcAW8l3A5cSTwJGZnMCUDQXAkAubwDE\u002fosBE+nPApsJfwODGs7\u002fGIy\u002fAVPgOwJJsm8DyDnbAXFN5wLaD9L8yX4\u002fAiM8LwC7Un8CFqaHARb2owDTBpsBZsuG\u002f+aWRwLMrgsAAUlDAIZ0KwGm+psCdeFPAjf+HwA7LJMC9iWzAsy6HwE2AoMCgWIXA8mkjwLvlE8CUFbPAzqBcwPhBhMDMNCzAckg8wKgzEsA2Oui\u002fZ6ukwF54gMBu+InA8SIawO6XXcBDtiHAaRqiwL7tZ8Bp8RvAmrGKwGfUBsBf7APAFRNOwPyVccB+mIPAH4yZwKmYlcAF4TLAieM4wClOk8CwxpDAKLMiwMBfNMCZkkfAn\u002fDzv4zVwL\u002f9W4\u002fA+ONLwIBXfcDwjOe\u002ft1z\u002fv4C4mcBdJp7Aw8iBwPREQcCd5jvAMMf5v4HorcDG2InAdxm7wKDgecAee4fA5ERQwHH0a8DQJjnAg1tcwJd2bMCWjSjAyymFwOhwPcCg5ZLA9a6QwI5NKcBS5V3ADiuQwEDRmsA\u002fNVXAYkQdwIZrgsCuc5rAw3CYwPFyn8CdFmHAgV19wAAALsBODobAkOKawOnBZsCbcGfAaWdTwD+hasDNAlrAiczxv7y9XcCfULnAumNpwMUbqMBwOYTAa6suwAlIgMABIYLAP4WLwIaV078eQrXAyjfsvzKbmMCSQdW\u002f21xhwFtDjMCsXUfARQ2pwETmkMCxWEnAHHs\u002fwHOfGsBYrpXAZPGhwJD7XMAJnkHAFs6KwG6CL8A8EqHAPs+WwDSOhMBNiYHAhZRnwG0zRcBMFOq\u002f9maPwHGGRMB+QoTA+mRSwJATDcCG1ZPAxqqcwOhEQ8CssZPAyVJPwB\u002fkkcCeFgLAWWa1v4P6uMC2RgvAFVSpwLx+T8CblDHAQFlTwPMcIMAQl2fAmJ70v47APcD6q1vABnMawMIuhsBfWFfADY+BwFVtmMD6ShTAuK4twAiX9b+CZSzAEyhXwLWpssAXsYPAN4k5wLiIAcB3mpHA6YiBwJkTgMCgMHTAkKQMwFotecCTgtC\u002fgbatwDkFBMDjZRfA7bFRwActNMC5a7zAYEWSwIjCt8D8UKTAKCSIwJnnpMAUqRDAYk5ZwK3qP8ArymPAlhhHwAjOZsDloIvASp8dwAXvmcC65E7AaVNowFt4DcDnSZfAWh47wAEoh8BrNJTAR6Xsv+ZiLcAqh1rAp3aRwKKNh8DmeaHADKyWwIWFrcBWnWLA2hakwNaFnsByibLAFg3TvzaAisB\u002fUETAVZixwCEnI8BGQFjAAwu0wNUwlsBS\u002fBLAcDbWv1BHaMC8IavA9cdDwDXM078Px2TA8kaNwNwwPsDezZTA5P8iwCZlh8B1dre\u002fz81rwFtfq8Cx2FLARtjCwNI4ksAXCb3AuUmLwJzFHsA\u002f7mfAgcxkwEo9RsC3PY\u002fALn9swHCElMCgqBrAoNvVv32L6L8FspHA1gSLwF8gBMCHXSLAGo4GwF8F+b++bYXAOzj7v5JsYcBHb2DAhmJJwKXNrMD7MVrAa1hlwEV\u002fmcA4hwPAcvmLwG\u002fxQ8D6DwLAZaOLwMSqjsC\u002fg1LAya4\u002fwNMzlsA82sC\u002fPk6HwMORccBuUSfAArqZwHrWaMCkYpbA2maKwBNCN8CjPpvAGuSOwEwcg8DfmmrAaUWjwBvnrMDodJnAIAgOwGHUmcDgX4LA6pLVv0ULGsBq+2HA6k6uwKudMcCTFKrAP0ZxwLC1ccDRH2zAUnNqwCxbbMB2Y+u\u002fUmmtwBRtQMDVFz7AJ6uawGiRiMDWmjTALFRGwKYSIsB\u002fOpvADuuWwA\u002ftbcBBOQLAC7qMwJDAKMBzR0jA8gh+wCVMlsA4z\u002fS\u002fKJIJwBv+s8Df0j7A0VOswPrfXcA4koDASWZAwFAOTMA7FIHAkINUwOagO8CQ7bTAwmlnwAQsXcCpZ\u002fe\u002fGoJswL0vq79+OozAfBZOwB19+L9\u002fm43AJRmpwMGeJ8DrAj7AFcgdwHF9usAkXIzAtW5kwOXaNsAIlj\u002fAPsBPwNbDGcDDx6XA+fS7wJToc8CQq4PAYkmRwAKHH8ByR6LAJaoIwKP1F8AKrqjAkhQ5wLZHlMCymZrAccKvwA5hhcBPyF7AjomMwC3ofcDUIVDAqEiFwAQSrsBr+EDA8r6EwJ4OccDdWDrARtmXwHiqlsDtT0zAVS2IwG\u002fpbsCIKFrAymMjwJEuhcCiC\u002f6\u002fpWOEwHOg0L+0WFjAChNnwOvtMcCf8EzAF0+HwN5SMcCa78S\u002fb4w6wHiPgcCl\u002fIXArWSdwM32bMC2VHbA20pawCkzMcBtyDPA3XOSwIEmasAuekDAN1xPwJONSMCzGWfA8Y2JwJ7PPsBslZnANrJ7wBdDV8Ah\u002fpHAKgGGwFnwlMAh\u002fue\u002f\u002fQJTwM4BFsDPIm\u002fAjnewwA2PL8CfoaHAkZN1wPRP5b8M7xnAZEw0wMQWV8DPc3vAD3eKwC89T8CEA4rA4YanwER0lcD9zpnAH2WEwF4AHcCxRdG\u002f67UNwE2Tr8Ceu8TAn4xZwHnhgsBesm3A3rGpwLlxW8DF9C\u002fAkCAGwHFCfcANj1TAdMmAwGzNPMCRoKbAfiOUwOANX8CbB0LAVCdQwOtZrMCUgIHAvxwuwLywHcANe5XAqRl\u002fwNJPusCTnTbACG1XwA2X1b+3MxnA3cKEwMSZW8B2iqPAxKNTwEeCgMDCeDvAU6yOwMPlRMCtPcHALmx\u002fwIQRocDVN6DASW6CwBCqcMAt45HAIeKfwFdWgsCsO13AYklAwHSYI8DJBk\u002fAnuxbwIQ4j8Ab7EbAxXutwKTnM8COSaHAF7OPwH1YT8AxBMLAksSrwMKbCMBqWAHAEhDjv9jNnMC+cJrA+pVmwEtwj8BziF7ABS6PwEWQecC+dorAFViIwJusZMB2AI\u002fABoBtwEAXnsA0tIfA4TqPwOAzhMCHZHHAnImJwNlHb8C9k5bAHUEdwCfLlsD7oEfASP6AwEY10L8+LkDA\u002fyfav3IXiMD0UYrAd8rjv9YJhsADC6rArtQfwPafWMBZnB7AuOpxwKRnEcBgLhrA2kB9wCbuFsBTDBDA6BBywDJti8Bj5SLAw66iwLUOZsCCXqHAyDaEwMvahsDmqYTAuozhv7UXvcBwgAXA2UQ\u002fwKBIZsBFwoXAefFswLlNj8ACQ7e\u002ftiKDwLz5DsC+LVvAw\u002f4mwFD0MMArDmPAA9OGwBidLcBpWmbAGriRwKXKScDqeFbAVvRwwEGr+r9naJPAy5E\u002fwF5lScCTjI\u002fAbXA2wDnisMAEV2vAfnshwO\u002fQUcDPkw7A0zJSwHnigMDKZZLAfDkLwHrBoMC\u002fNW3AJYajwH8fSMB\u002feIbAUIMGwPR2MsBu5rLAGiaHwM4bMMBj1wLAcaTmv\u002fo2ucCsAo7A87JhwNMlTMCADKLAz7KKwP+4fcBZvmDA6f0RwHHWlcAiHoTA4CyKwL5LqMDxCYHA5n5awB0wr8AFaljAF5ldwN3zGcDg4RzA6wCawPqOHsCCCa3AYLdMwHDMXsAPorjA\u002fxNUwNTYtMCStHLAyuwdwC53ecBuaHjAqbw7wILsOMDzm3bAyJilwL\u002fGF8C6cIHAZMtOwPd2q8DFqxDAvya7v3g4ncDgeaPA3GWDwBpbXsDLTVfAG3eewIN7ZsCiS5DAU5EbwKLLKcB4xo\u002fAGeViwLbdccApyBXAv7F9wNB2ncBnxxzARmyewHFaPsDoem7AfnzsvyW1nMCoWqDAmwUXwKJ5GcChfYPAxkK2wCwwIcCLU4LAmTcbwKSDVMCRsajAxww6wFDPl8B0JGzAgfeSwKUvPMANAYbAr4yewPjmocCJ+aK\u002fglQJwKL+pMDstX\u002fAXIgSwE+uLcCLAKHAbfTBv8fjPsABY1\u002fAF66uwD3iN8CKNJrAxxK9wEl3QcBkV1rAbgwvwIph879bLqjA7LI\u002fwFzMZsCDxWLAQtqewDhGgMBBSOu\u002f9ZQjwEU5jsDJcZDAe+JNwIephsB\u002fO4HAAB6mwC8UFMBNaavAp2+nwHlfO8CL1R3AUCCTwFWCY8Cq26rA5qupwJGZGsBEVTPAxHH2vzXaf8Dc96XAWUgewEmfR8CCOoXAHcVkwHEuFMB\u002fBP+\u002fChyAwEWaa8BrxxbAKt+nwOo1lMDl10DAX1SGwBfZGMCMFJPAiS4kwMpwNcD6JSHAQ54jwFd\u002fzL90UZTA91adwDsVhcB2HUjAKl\u002fzv1nVlMBQxjDACLQowC9kXMA9YH\u002fANpuKwECCdsC5lDzAESaQwBTSQsBIDI\u002fAxp5JwBPp7r\u002f5alHAXgd3wBD4jcD\u002f0xvAFRR6wNu+i8ARLaHAYumUwD5RksA\u002fhnzAh2KQwFGJisB3P\u002fS\u002ftr2sv5WybsDfcUzAtgGtwBLhosCPRYbAs9uhwNl2v790+DjA17znvxDlNcCAyIXAcuaQwHZ6CcDB\u002fVTAd1uKwF06lMBSauO\u002fURh9wMWkVcD+fXzAFKhSwFu1g8BvA57A\u002fed9wKzdYMDuExrACYKGwLD6e8AnMH3AGtGEwCvAuMBC2HjAr72fwB09uMCADnvAYoWzwNmiqsDlqC7AXLF6wO\u002fdX8CNv8DA6oUlwJ8TacAWp3vAuZFzwPxvWMBBzJ\u002fA\u002fh97wG6QnsBwJ5bAaHGqwHelpcBeTI3Ad\u002f\u002f1vwIihsC1My7AB3vFvxgnEcDldWzAGz+DwPSlNMB7A6vA2212wOOMlMBjh2XAX6opwMeWYMAd+oLAU6TKv8i6ZcCv\u002f4PAcoCywMw4DsBTRJzARmxFwC3dnsB+p0PAb4qGwA4TpsBgn7TAH2OKwMUEkcA5nYvAZsVnwMoSZ8CxIQXA88wZwKhUqb95HxXA86zdv2GrTcCzL0rAP51uwJdNNcBdz4rAulamwMEU5r8pCILAPiCDwE2fhcDLpDTACyYuwFAcjsC6lTTAhtM2wMnZvb+Rx43AYJQ6wPaYssCDHGPAz+h4wJ+ibsBKygHAgt51wI0sdsB0Z0\u002fAiqCjwMVQj8CCPIvAr+ZdwHKuYcBlN+O\u002fyUkOwAaARsD19XfArkTDv1dQhsDpbG7AC0Q7wEY6lcC5NnzAm8O1wKYKpMDptV7A4SpXwNaphcAzS\u002fy\u002fu\u002fNFwMFqu8DaWCbAhLdHwFmAWsB\u002fgve\u002flvWBwPzdhMDjKYTA1G\u002fvvwkKZMB7OkHAK2J5wBnZnsCzTibAd\u002f1pwLb2TcAUiy7AYKSlwGx0RsDU5Li\u002f3RmtwBz1KsD6sovAKueLwFonfcDPg6XAyTpUwGBlqMCOvbTAzxaTwLF8WcD6vrvAIOWIwOVpMMBceEbAU7UZwHdeEMBWk3jAxYNnwC3zfMAaqxfAjNqNwBJ\u002fl8ALXh3A6wVgwPulP8DOPJTAXqdmwOgZMMBDZW\u002fA9ZMMwNMMBMAJyqfAJHRYwOKXH8B1zaDAbO8hwJRMjcASkdW\u002fdeiawG3lj8BWO6PAsqCmwBe73r8CPJ7A5mJAwHjOW8BqCCzACS8DwKGfEcBC3nzAy9sXwAvGGMD\u002fY3XA8wuFwOiUwMBm1LXAuuDHvw4sWcCp3qvASeGJwAzodcAnNpjAsVoZwKsZX8D3XHPAF2s\u002fwNAM7b+GxSTAoxOfwAP7b8BmiYrA6eMCwNUBwsArE3nA0FCAwOgdI8CX3krA4OC0wIw3gMCRXWTAl5udwPkWYMAhoVvAtRpXwCfIXcA9SarA1fgswAeXYsC2jVPAZsFQwI4Vm8BrOKLArb2awOKRuL\u002f+1GPAAwoOwOJvrsBHdSfAHJFEwB7RgsB+iabAIimcwOtIF8BtKCDAcTkCwGs8ssCniJjAB54KwDg2UsBAI0HAITgQwOPtMcCw+mvALpaYv8sJUsBzoL2\u002f3AiDwORsV8BBs+u\u002fy\u002fJ5wHThfcD9zUXAyUqBwJfGb8Dh4WjAG0E5wJcur8CJfYPAjvh8wBs\u002fl7\u002f79nnAWc+rwNKtlcAovAXAAo2Uvw=="},"xaxis":"x","y":{"dtype":"f4","bdata":"KbV\u002fQPRJuEBUdMRAe4V0QBsWeUCSfVFAPmmlQO4wJ0CKxyhADeuHQJkEY0AG0nVAGgd9QIiPN0B8boNANcZcQGDxn0BQtaVAJVQqQDiTNUAt3mtA0LmjQDAwoUDxbnFAWBshQM8TqEB5I3BAfSJfQAf8R0C7oaRAgDW2QAeWk0CvvZhA0lh+QGZnpEDzGHJAHxqXQGzJhEAdrzFAgfxqQNKDMEBZnKNAz11RQOZemEAn4b1AutfMQKH6QEDTPpRAOSelQEk\u002fU0As0WlAUbmMQEjoS0AtnHxAxuuwQPsTs0B9zphAxauQQPKBckCql6JA8AmYQNeIq0BiZIRAkEQzQNxPtEAOrLJArmKfQLwUZkCIkrlAxF2nQERQr0Ab0JlAjPbEQOAsPUBwpr9AlmRgQB3nlEDZksFAAFK3QLjNkkAllodAtuCWQGmGOECh0VBAmI20QGwEh0BIRUtAabCHQL77d0B39XBAa92TQDs5lECo7DdAEEO3QJYJS0AHn4tAkV3UQDqEnECGRKhA43JCQM8JlkCqIaZAxqlTQL9\u002fd0BZXL5AYYePQIlalUDUwKRAFitBQBlRkUB2X11AfKQdQBRoukAIMrRARW18QMh5uEAsg8BA8EuLQAuQlkDfUrtAgx23QIFwdUA1PKhAPhIYQEZKsEByw5NADUWxQOEhoUBoy6VAEkNMQNxdk0BgsDNA+vhmQMlmRkApiatAWgCGQMQwcEBuA39AFNiKQLgHXUDNjrFA9r2yQDouY0A+FBdAjDBcQBdik0AIlkRAJvpuQHs8YEDZ7c5Asq5zQJ6SE0D\u002fX6lA1YK+QJ0jYUBzi8lAaLyoQB+HR0Dc4htA2maMQFEogUBa5ZNANMuKQKluokBNPJBASxqLQA0omEDd261AtyWcQExij0BpcDxAI1pvQMh1t0DJHUZAyUKhQLUcxkDPbY5AZqOyQICkOUD4RSNAoKGhQGndQkDkZINAymKUQBvDQUBlJ6tA8SDMQMNHRkCo3xtA7xtyQARqn0DwIEtAsoqjQBN5fEA8VJpAPLJ2QAndxECqR4FAWzGpQEwbhED0g7tAp+pjQOaaaUBB67tAdDGEQHMVe0Cpg6ZAz2FCQCm\u002fokDB3ilA2yGcQMvolEAgoo5Am5XLQIXsXUCdfWdAKUemQL7XuUCDkmhAqyeWQMqApUAuK7NA1l3OQI6jekAFWMNAVbXBQA0vyEA9sxxAcP1aQKs2bUDszVZAohhDQHWzfEB4yZxAWAW7QMjpu0AXLKBA03piQFW\u002fqUBx1YdADleeQCufhEDKgrJAKEBPQLrpjkBfjM1ADT6tQIjlkUBkw4VAqWTCQBJlr0DHZJ5Al71kQOF9rUC5w1JAclbFQOZFg0DRSHRAQ+GlQNTvvkA9f0hAXUymQLLVUUBauShAKFxPQMlyWUCv1gpABOyEQKhsp0DZY7RAZnaYQEqwf0BsHK1AH4hxQJaViUA+ysBANYpzQOUWkkBbFq9APktGQIj9YUA+IV9Aoj6qQFHZNEDTYLJAaW6vQMuckUDj+4ZAFWQsQKjunUARaqJAMYVAQLLrKUA5e6NAMzWOQJson0DShJNAVEF9QNZpn0DF+6hA59l2QOw8m0DSPZxAqDcwQLMUpUANxKBA4GSvQFs5sECW91tAXKqtQCAXvEDDlchActKCQPaLokDwB7dAdEizQLDxvUDAFxVATwTFQFJ9q0DvwL9AgKHEQOnAhUASOnFAENk2QCJjUkCOmbhA36GUQM94JkDiu2ZAlRCGQCADtEDu+6VAxOtzQH1XbkCN3b9AhVdyQABGoEAP2stAm35MQB9+i0CB22pADRyPQBPdY0D7OqtAS5qMQJx0SECR+6tACuCQQNmZkECvLLJAzbS6QH7ZaUC1Ky1A4y9gQFFmu0DzvJ5Anld8QDsMz0Aex6BAVXlPQNLmokD2tI9AlAI8QApxjEDH719AcmOSQKKxg0DX5sZAe8mRQAXohUABl31Aj18nQILZi0ARCFhA26GgQAvbfkDvm69Aijy2QKXUO0BAfXpAAKGsQNcUckAgQKhAUECAQFdfukB7HopAgZ+fQPB1kECqwcFAsjFIQL+buEDyppxAzqC0QC4sfUDZWJdAtqeGQFRjjUBGTKBAt4K8QJPns0CcPc5AJvKPQDbnNEDA5FZAD0+dQEPDn0DIGjlAxq8ZQC6Kg0AdvUFAGexDQOIUbUD1lolA7hepQPTCkEDgf4dANw6SQOuWyUCvXIpAOlyqQFYTMUBrKm5A+nimQAd6V0Alr2ZAjKaUQAhfNEB+3LpAezh1QO6jRUB22S5AHl+VQFohdUCcjbBApwyXQCtviUByjcVA97U9QFwArEBa51lAmqw6QMdSYEDaxodA5lyoQG+LO0D3HL9A0ByPQLMbi0DFNWtAoL+tQKPipUBU76RAs\u002fOZQIsjxEDbfplAvsvGQKb7uEDfmNFAt6aiQAJcSEBnSXdAkPOzQHlmOECZghxAfReDQEwEgUBgjNlABHAfQHerXUA9laxA5lJtQIbPhEA02pdA6zxxQCtOmkDaPYRAhRMxQKDEkkDK9klAS+ymQG+7kkA8QbBAj5uMQHNFnkDkkLRATVGSQFNcj0BjXaRAteqDQD+LN0ASgrRAgvqxQOs7NUB2O4xAe1CXQDqamkALZr1ABhJLQAiESkATF5hAkymSQMauk0DEzoFASIJuQJdVqEDOYjVAXCQ+QOaJq0CnNZ5AcHuSQGzSzUBiOGFA2eJpQJ3ps0B18XpAFkKWQDQeoUBvyp9Ax8nOQGBRr0BsTspAzSu0QAKRmkDQmIVAb+luQNE5rUBUI0FApYuiQFk7T0At25xAt8TEQA4aV0A4OBVADCrHQMUYjEBXY9dA4vqlQIybvkD0RHdA7s9fQPtqxUC7sbVAT2bBQMBHtkDYwX1AADeHQJdOtkBCnpJAqTGNQIhFu0C30ZRAZYhZQP1orkBNkLFAmY6gQAOPmEDU9JVAxVuMQIszTUBw23hA\u002f0u1QGtUdUA1ShhAsD1hQFCTwkAZro9Af3i+QJuovkAjMolA749kQFT6rUA0Q1tAMx1HQEpPckCyJY9AbPfAQGX8eECm6atAl7GRQKXFmkBAdixAEAGsQBy9xUDxhL5APXuVQHHWvEDtY4ZA7+pZQGWMvUBBybxAaR+TQLcinUB6MR5A9xJkQPjCXEBiv4FA0\u002feOQMfzhEA0OlJAqLaeQBbqnkDDEsxA0gtlQKCyi0BmTo5Av9iSQFYayUCnhoBAToJNQBdIe0BmbMNAJQqOQIx5U0BH+J9AKyOaQP9FoUCtlmNAkyyMQGqrr0AHtXdAAkeGQJrEtUBwapdA8HiLQNNFg0B2\u002fRxAYqiUQG2KukA4eldAKe+nQFGkgEBdSYVA+Ry+QB3gkkAEAkNAoQ8kQCxBnUC99IhATQ3NQBP+VkAw5L5A\u002fZ+MQImId0CpUhtAH0KJQBb2hkDsCalA50KTQAbLx0C6pINAn5WeQOXXm0ADKzFAdOC\u002fQA16rkBNBBVArDg5QIOfbkCOI5FAz3lLQCDmrUDm9aJAFp+2QCilakCAXTdA\u002fBRfQIZgUUAVUChAC0K6QHhWnEB\u002fmTVACe+KQLI5gUDXXL9AhqGqQBc7ZECXtZBAAkIbQOg7eUA9ZplANnbQQKj0UkCog8NA2SioQHlsiUDakktAGVCoQEYziUCkyF5AH\u002fexQJ4XakCn3SlAge+GQDksPkD5v7lA\u002fOCpQGrlyEAehzFAwS6HQFmmsUCqWgpAb8+TQEBcgEBls8dADPtzQMBZnUDBnzZAOFNHQP+pNUAH5ppAhiS0QEXoikAtSI9A8JXIQIB2QUBBilVAGoGYQHEhVkC0yKxAMbCxQDW+m0ClyIhA5Xy2QBWXwkBjGq1AjuSKQOt4EUCjIoBA7d2CQLOJsEBM81tASElUQK1zp0BPt35AIja7QFQTmEDJPpRAv\u002f\u002fMQJK00kB5BahArny1QEcHxkADQr5AA22xQGkWtkB4GKFAxwGhQFOkiUCfSaZAywlWQJA4oEAgDVZAA+2ZQNoRuEBbTYxAb3eUQM0+sUBnmqhAbRqwQP8fMUBtTqNAELxPQPDjqUC240tAAChUQGbLoUD\u002ftJtASrKKQKM3gkDcrJJAuRuMQMH7qEAeI6pAtv57QMgvKEAsKzhAthFkQFHfmUD30ptAYwaeQKAUjkBLB4ZAd4ptQBcuvUAG6ExAScSbQKR6o0BHg6ZAUs6DQPzHeEDjdW5A\u002fGGYQMQvL0AAkDlA1lCeQCmyl0AXA7ZAcvKsQJVkp0BjJYFAUnRdQAzrbkAxx2BAM47CQKeXzkAnOkRAIojOQGT0FUBUZIdAi95gQEKsskDaX8dAxo+5QPYnnECs9iBAuWmJQHUjsEAs51xAtBCoQEvKXUAPJ9NAxow7QDQZgUBASUlALDlkQNNKmkC609NAaxFZQA+ZjECSM8tA4lhUQJdRmkCspVdAep6EQBKSQUAUTo9AZKi8QDntSECsg2VAmWp\u002fQF\u002fvXkClEotAptuUQH8LkEDhnlVAlGybQMEemUAbS8RAzNmvQOiymUAJzoNA2A3CQJjDgUAccL1AiCMpQFBEx0Ahv5RAR68uQFdjokDAqLNAE46XQPe6LECvna1AFhtwQFjJdUD+kUNAPqDJQLW\u002fFEAatVpAFn+nQG9ZFECv54dAcaSJQMVLq0ByA4tAwiKtQF6reEDqIBlAKCGQQKoVPUBcDaFARixeQPBiskAPiY1Ab8uWQJesMUBpXEhAM5WrQONVckC\u002fTr1ArlW5QFk2gEAPc4lAQHu8QBGil0AsWw5A5207QMJKFUAQe3VAUgRuQCRenkA\u002fq0RAfjeZQNZKuUA45ZVAD25KQJruikDrYJJABPxjQHkcz0DB+XlA2LmvQOXPiUD2u8NAWTCJQPDtkEA0yMFAyxxQQDsAnkDhZJBAel7OQCU8lkDnO5JAyHi5QG3YukAebmRAe0mJQFgYrkBP67ZA7F6pQC1lY0DggrNA73GpQI\u002fBlEAhtZFAaNmtQH7lF0DjkjpAqu6MQPPMXkAMgMhAG8OqQFrIe0AjvKNApK1zQCUBcEBdFF5AnA6dQDFqoUAdOhFAVz4jQNxsrEDyBk1AtxSlQAsutEBRtoxAvKgLQDsgo0DXbohAzbarQAu8PkAYhoVAfX9EQALRwUDq1yVAPU+fQP8BbUDyLH5AChKSQIjYt0DXv5pAoTwfQMzVC0CrksBATUGhQM8iV0BgOXpAtbdWQOJbdEDttZJA5y14QEG9lkDzcWFAXLGjQPE+LUBKrnBAo4knQG6aoEDPUkRAdEKfQKzUyUB7tHdAD8PQQEXRkkD+pMdACrKsQPlIh0Dns4RAW9eiQC9Ju0Aso2BAQpiXQFFXW0CwUbFAmCWqQCs4zUAC6mNAMq2rQOBxuEB5VZdA9ps1QHKDnUAvqZRA8c4\u002fQL6lm0CvRFdAXne1QD2woEBPua1AX+KBQKV9HUARpolA2RKFQNETS0A76IVA4mY5QGfDRkBvotdAjWi2QBDujUAV1HpAlDbTQE6VjEDJsIZATfzCQDlepUCeOk5A6VSeQAtsXUDERpRAMY0hQF0ObUCCBZRAECOnQIkQs0BZa4hAVrktQCQ0rEAk16lAJhGoQONhvUB4hItA3XguQPesh0D3J8JAoayGQNXti0AGzZhAm5GiQOnJl0BiY6tA54m4QOIigkDmDrtA3DRiQFEYs0C4\u002f5xA8dF9QLhBtUAKlJNAXZ0jQJjOEEDtIF9A0XinQNfLhEB7poFAFzBkQJ1QhEAf1r5AXgBIQM+iiEBHu7dAg1phQAGEjEAhIKFATrRVQDjKgUD1Q6BAwuq3QNUHfkBePVdAbT1fQCpCQ0B4SFpAXlufQGnyp0A8E6lAk7hsQJ8msUCSgEVAjpGcQM6dq0A02KhAlClxQCegU0BRR7FA5\u002faHQDrRcECeP5pA29JWQJRczEBElJtAX0MzQKUvbED4a5xAYuSyQOr4e0C54KdA8LyzQNfGokDMGKJAlLfFQPROvkDRcMxAamgmQLC4vEAr2YlApwKAQMm4qEA1dhBAiMEfQAvYoUDphM9AedaPQOX9qkALDsRAuCKhQA=="},"yaxis":"y","type":"scattergl"},{"customdata":[["3",960],["3",1058],["3",1422],["3",877],["3",1017],["3",1017],["3",822],["3",880],["3",342],["3",825],["3",1240],["3",1649],["3",967],["3",801],["3",554],["3",857],["3",859],["3",1042],["3",1202],["3",1256],["3",928],["3",316],["3",657],["3",480],["3",699],["3",710],["3",862],["3",860],["3",1228],["3",1194],["3",846],["3",996],["3",466],["3",1310],["3",889],["3",496],["3",855],["3",906],["3",1189],["3",480],["3",489],["3",1111],["3",1546],["3",1014],["3",1168],["3",1374],["3",1055],["3",310],["3",803],["3",956],["3",752],["3",721],["3",923],["3",1172],["3",698],["3",602],["3",1069],["3",909],["3",435],["3",779],["3",718],["3",574],["3",1119],["3",1097],["3",1116],["3",726],["3",720],["3",1011],["3",948],["3",766],["3",1422],["3",1248],["3",1020],["3",791],["3",993],["3",992],["3",1045],["3",1097],["3",445],["3",1068],["3",779],["3",706],["3",981],["3",561],["3",655],["3",1230],["3",540],["3",1569],["3",907],["3",1174],["3",737],["3",994],["3",714],["3",953],["3",841],["3",783],["3",431],["3",490],["3",618],["3",748],["3",1331],["3",937],["3",470],["3",1083],["3",884],["3",466],["3",725],["3",925],["3",660],["3",1181],["3",715],["3",1155],["3",689],["3",383],["3",373],["3",830],["3",1004],["3",1178],["3",565],["3",1167],["3",1095],["3",1551],["3",646],["3",914],["3",940],["3",978],["3",630],["3",1134],["3",800],["3",1104],["3",1061],["3",778],["3",1032],["3",690],["3",626],["3",891],["3",414],["3",1218],["3",364],["3",1091],["3",898],["3",1241],["3",723],["3",354],["3",760],["3",1200],["3",699],["3",829],["3",1006],["3",366],["3",817],["3",486],["3",1289],["3",1101],["3",737],["3",557],["3",1134],["3",724],["3",885],["3",1165],["3",822],["3",618],["3",1112],["3",614],["3",1144],["3",803],["3",741],["3",558],["3",813],["3",1145],["3",755],["3",1253],["3",472],["3",848],["3",1020],["3",932],["3",705],["3",404],["3",1070],["3",387],["3",640],["3",886],["3",800],["3",938],["3",593],["3",1218],["3",415],["3",1378],["3",1169],["3",490],["3",767],["3",1220],["3",1512],["3",1170],["3",999],["3",777],["3",1015],["3",939],["3",1193],["3",623],["3",780],["3",1322],["3",801],["3",1241],["3",595],["3",1191],["3",857],["3",336],["3",808],["3",925],["3",627],["3",1325],["3",1014],["3",1073],["3",532],["3",724],["3",1089],["3",461],["3",945],["3",742],["3",1186],["3",628],["3",892],["3",449],["3",1053],["3",1240],["3",851],["3",1116],["3",505],["3",1064],["3",719],["3",1351],["3",894],["3",1011],["3",829],["3",1357],["3",1093],["3",649],["3",307],["3",1621],["3",331],["3",733],["3",980],["3",912],["3",822],["3",571],["3",1027],["3",746],["3",488],["3",922],["3",1005],["3",563],["3",903],["3",901],["3",1061],["3",1386],["3",793],["3",901],["3",1108],["3",843],["3",1089],["3",607],["3",740],["3",1118],["3",283],["3",1251],["3",1631],["3",818],["3",1341],["3",902],["3",988],["3",771],["3",1127],["3",774],["3",910],["3",1152],["3",1130],["3",902],["3",879],["3",763],["3",1226],["3",710],["3",721],["3",717],["3",1062],["3",1264],["3",341],["3",325],["3",498],["3",486],["3",875],["3",752],["3",1157],["3",1209],["3",490],["3",1114],["3",854],["3",681],["3",790],["3",806],["3",1008],["3",1149],["3",323],["3",370],["3",359],["3",1283],["3",1010],["3",1208],["3",362],["3",1135],["3",1102],["3",1168],["3",699],["3",984],["3",740],["3",754],["3",1001],["3",628],["3",365],["3",1000],["3",1101],["3",826],["3",1123],["3",587],["3",758],["3",452],["3",515],["3",392],["3",1158],["3",892],["3",558],["3",1179],["3",1194],["3",639],["3",897],["3",460],["3",1223],["3",778],["3",765],["3",314],["3",1160],["3",1030],["3",935],["3",1083],["3",558],["3",625],["3",1028],["3",832],["3",585],["3",663],["3",826],["3",642],["3",605],["3",379],["3",787],["3",1460],["3",940],["3",647],["3",1321],["3",670],["3",795],["3",825],["3",830],["3",429],["3",635],["3",971],["3",506],["3",922],["3",806],["3",1467],["3",904],["3",1211],["3",872],["3",1496],["3",1389],["3",1135],["3",935],["3",980],["3",1192],["3",746],["3",750],["3",1197],["3",624],["3",659],["3",958],["3",1634],["3",1195],["3",942],["3",795],["3",715],["3",546],["3",862],["3",1141],["3",1285],["3",705],["3",765],["3",747],["3",1191],["3",848],["3",1061],["3",699],["3",1324],["3",675],["3",480],["3",472],["3",894],["3",1216],["3",967],["3",382],["3",655],["3",754],["3",557],["3",1383],["3",1141],["3",954],["3",1035],["3",1030],["3",416],["3",522],["3",880],["3",767],["3",911],["3",756],["3",1020],["3",727],["3",1100],["3",476],["3",845],["3",1302],["3",1108],["3",620],["3",545],["3",1290],["3",802],["3",337],["3",1117],["3",583],["3",669],["3",820],["3",468],["3",701],["3",795],["3",364],["3",1212],["3",1130],["3",786],["3",840],["3",794],["3",971],["3",919],["3",979],["3",414],["3",906],["3",888],["3",712],["3",1126],["3",823],["3",1249],["3",1053],["3",515],["3",1324],["3",1210],["3",786],["3",1013],["3",1002],["3",959],["3",711],["3",734],["3",876],["3",533],["3",786],["3",1012],["3",565],["3",1357],["3",819],["3",1058],["3",943],["3",1093],["3",1103],["3",862],["3",1063],["3",850],["3",800],["3",1155],["3",458],["3",1153]],"hovertemplate":"cell_type=CD14+ Mono\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"CD14+ Mono","marker":{"color":"#ab63fa","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"CD14+ Mono","showlegend":true,"x":{"dtype":"f4","bdata":"R246QWfvOUHOkzRBHBZIQeuMPkEw2i1BIK5MQYpOMkH9YUxBuCE1QcL1NEEryjNB2Nw4QcZ7SkEYvUFBIUdEQYSfRUHjXTZBnUI8QZHtQUFlekdBbbRKQSIKMUEDNlBBDC9FQcqmSEEQjTdBPpk0QbqUJUGKZy1B9xpJQQn4OUF4KTFBEh0+QbnSTkGmT0pB\u002fxoyQcwbM0GhpTZBrDQ1QfUTMEE\u002fMihB99M\u002fQTSFPEElqSlBY+ZBQcC+LkFil0ZBJ28tQRNoR0ELhzRBe+4qQVyCQkFpijdB848sQVC8KkGtMzBB9aZEQc8OOEFS8CdBEvIwQc6KPEExKDtBmsIvQWqRM0EdhT9BXsFDQZPlMkE\u002fpixBi4pFQafMNEHovi1BPkRGQYVMQ0EpA0RBNYtBQR7tLUHMZS5BIw9BQS6YOUH9Ty9BTwRDQX0YPkGS2EVBplc9Qa6NOUGRCDhBu7g4Qfg+Q0HuyTFBTHgxQZ1gO0HkgThB82o3QeckLkF\u002fRSRBCbBEQWo9SUGl8UhBtdRBQVgAMkGK2jNBE\u002flNQd9pPkG4Wi9BnZw9QW1ZP0EM6j1B3Fk6QfIQPEF5aklBfMc6Qcw2QUFnOD5BKeg8QSpZREExByJBNyQxQSzMPEFw1kRBvBg4QcG\u002fMEGfPjlBS4Q\u002fQViZNkEE+ixBqXZDQdtPPkG4DStBk0JAQTLrNUFlez1B7OM0QXKbOUFeIUVBXnU5QaGxQ0G+nDZBLdlNQQEGNEHPtTRBqHIuQZz+R0GcCE9B9cZFQabSREESxUlBPOIyQXOrMkEU2kpBqglLQSqsUkFZd0dB4ys2QfGoM0G0NUBB2qkuQTQXNUHUyDNBbb82QYixQ0FO8EhByMc7QXrbRkHBripBq6w5QaR7QkE+fD9BB21FQcYcO0GUJDhBA+wzQWHeQUFzBElBdGUwQUxmSUEmsVFB\u002fSE\u002fQef5RkFMGj5B9hw4QUKLRUFFJS1BHJw3QZxCUkEBGCdBORE3QX+hOUFxsTFBOa9MQUmVLUEyYChBFqk2QS6uOEE3TktBqrQtQRgQMUHsaitBDJYsQeK2LUHe+UpBi3o+QXtVNEF2+EVBu7hIQf6NMkFVnz9BDAVRQV+ZQUHJjTdBjZVRQRpuKEEKbkBB4ws8QRgaRUH+9DdB5w8zQeXoO0EPUytBJ8pNQQ3\u002fNEHaiDpB8bFJQckGMUHwAENBho1AQY95K0GX\u002fDtB+s5GQZK\u002fQEHOFkFBfL8\u002fQUrhR0F2kT1Bi9VCQWH1J0FFFzxBvwgvQR9vTEFZmDNB4LNAQU7XM0GHsytBz8s+QSH6S0FrpT9ButEzQUibKUGjb0lBiL0+QfesSkH2kCxB878zQYaGREHXmylB\u002ftExQQmwOUEWz0BBCiwrQT2\u002fMUHCLEJBNfw9QSQnNEFXGzFBUxVKQeilMEHeiEJBJ9clQQIKREHbEzFBKWFAQWhxTEEGPTpB+kw1QQikJkHi4z9BWv87QRk7OEFhlS1BaXNIQW2sMUGR3z9Buhk\u002fQd\u002fJQEEczS5B8nM4QbBZPUFjT0tB4hVJQY5cP0GpJTpBZ04mQWGbOUF06DdBNfI4Qf2yLkFnpjNB7b9KQTR4S0E5Lk1B4gQ+QabSOEH6j0BB3x9JQYyWRUHARi5By2w\u002fQRM3PUHQUUVBqGg2QdLWMkHffydB1OZGQf1VMEF27kJBlz1MQVCSLUF6M0ZBY5A+QRnRJEHfCzlBJv5OQSH6N0HDSElBSjtKQcF8QkFBaDZBqpo9QQ29I0ErvCtB9mtDQbDZQUHuUzVBTz9KQbH1SUE+UDdBfCUvQee9LUEVtSlBcAVPQQL8LEFAwyhBr2RSQX\u002fIM0HhICVBcwU7QRAMLkHvqy5BJRg5QYg9N0GCEE9BQ\u002f83QY7vTUFRczNB\u002fEVKQdaYKEEAkE5B+SRPQV5iNUEmfUhBnrg4QTeTNkHbJj1BPAMqQY0MRkF440xB9xU5QUkJREFPvURBA5gvQc73LkFfhjdBsxJNQbK3NUG7AzBB1+UsQRg+KkF9OURBn781QeXCRUGXxz5BCpU6QUsUSkFVDD5BwRMtQXu0OEFVeSZBs3I5QXyQOEFk\u002fEVB8iVCQegINUF8tERBaNZBQRJeOkEoLihBMyExQQB4QkH3zEFBClRCQekETEF8ejBBxyZEQRuRMUH6kkJBUvhQQZddJUEdKTRBPhBKQYqeRUESQSJBXKFLQS2tOUGMCTdB\u002fjA2QccBNUE8fiZBGhtFQRBdMUECKTxBACNAQZA2OEEeiENBeE0pQf2ROUH4mTlBW6xJQYMdT0EpxipB29FIQWCFPEHgME9Bcj1CQRIPSUEnUzVBBTQzQdn0N0EnVzlBPLEyQSmaNUEVeVJB9JkoQSsZREHckzJBhnQ\u002fQeWhOkG83CtBqJJOQbmCKkEQ1yxBJ3M3QT4FQkH3rTZBcqc+QYq\u002fOkGMFzpBzXM7Qf3ZNUGEhjtBIpVPQYhIP0H5RylBespEQdJmN0EQEC1B8\u002fQ3QQGIQUELpkpBZfMnQVkjKUHhAztBius7QQNjSEGjFztB3w07QXcsNUHwui9Bs6k6QTgaKUHTpzxBAUY+Qb5iL0EJUDlBDaBAQYWDMEGyZCNB"},"xaxis":"x","y":{"dtype":"f4","bdata":"rBEGQTPl2kBpL\u002fFAHWevQPklxkDQLdFAp\u002fbgQFIx50AlfABBcFDjQDAC0EDafAVBQSPcQIwJxUDbLgBBFLK4QN6m4EB8PvRAnzjBQE9010BfgstArIrjQA2D9UBdHMRA4Ma7QFFc7UCN3gRBThXtQOcx1UDls+5AC6GoQD5DrUB9O89AHmvoQE4V40BDNwNBicizQHZA2EBGUp9AKgvDQMD22UDZd8FApVefQGe9AUFMHO1A18vdQEnOwUBMOvxAz6XvQF1b3kAQwLZAaWH5QGSYpEAFJQhB2QShQDCH4kC0afhAR6KzQDlI5UBtd9lANiXCQNibykDBPKxAz1jeQN+h9kDrDdRArGG5QCco1EAk06dAMxHvQLjb5UBK6MFA9njuQMBZ10A3AaxACgO6QDUa1UBfNO1AT2sEQS1BlkDK2O1A\u002far2QI5aB0FC3dNAeS7vQBDqCUGrTNlAL0UEQfS5xEDcfMFAx02xQHqpvkCtn8VAHSToQEPU5kCTY8lAtISxQP3L00DIlrtAbce1QIamBUH\u002fidBAz+rXQHJ49kBroNdAwufVQEDdtkBI7+hAtUn4QK9UxUCnDcZAr+7fQE4D10A8qdxAhg3JQOf3qkDbq9lA4+nxQF+RAUGDvQNB8YD2QMajA0EH18BAjJD1QDaD\u002f0DBEN5AyjbDQDFgqEAgtt1ANW6sQPp3wEAOwd9A8H3CQH2P20D+Ea5Aa0KtQFalwkBA\u002f9dA26rBQKAc80B5iupAnpbdQKkK50CLg+9A2mevQPnp7ECk7gFBH5DKQPiI3kA2IchA8FK9QGjJ2kB5GdtAN6rOQLCh6ECPmMNAckXMQONizECxYwNBo2rbQGgLqECcUvZAj6n7QBM9pED83\u002f5AFc0EQT5nwkC63uBAM0faQHr97UBk\u002fr9AUrb4QKRA+EAbgbhA6RSdQPXv2EB22chAbJqqQHeV1EDrGMFAZkzDQNYOsUDLrdRARpqnQINW5EBq0MJAWPrhQJYzAUGWVtdA9BbJQBifxkBGD7tAGTUMQXFvs0Cj8AJBACzHQEj840CBlMhA\u002f9fQQMxLvEA0GQBBBz2bQNMAxkBCpAZBeNqoQFwuvUDsmQJBDPDlQID830AgorpA5LS7QCbspEAv0thAuTfvQHHxBUGNe9FA9\u002frUQBiNqkAkgdxAw6DTQB98yEBf6tdABDvmQMeL0UDP8q1ALEYDQS3p5kAawPNAsSvMQGEx4kDDCrtAZBbnQMT\u002fAEGsLsFA7gzrQPTx\u002fUD12dJAn\u002fvIQIEHykAA6AhB3HPYQGfnzkBX0cFAVa7OQIkBtkBzUbBAx8wCQceP0kDLR+1AR\u002f6xQM4QA0EPgNhAa2TKQGhM0UASROVAPRoJQYeVBEGvu8BAp2LFQI1QzkCsva9AOu7hQALivkDr9MVAsFPBQK5i+kBoEARBqzXZQHLN4EAamfVAcQrMQAmI0UB1Z\u002fhAr2roQF8izEDhbfNA1O7VQITM\u002fEDn7rZAg7SqQNpH3kAsOsNAAhTJQK+rtkBaws5ANdnlQCrAyUCBEsVAFjTDQBBAxEBJ095AKh3aQAE+BUHo55dAlJ7FQKFe20CK0utA1Bb1QMj0rUCG6ORAvtrMQGUGzUAW48ZA6JfQQPLmtkChyQRB6H\u002f0QGJ5oEDLytVApTq3QHk8AEFD5rxAS1HtQAUs5ECiwMpADRzBQDzKs0CZ7bpA7N+kQBr03UDvqK5AjT\u002fKQK\u002fBA0GPu85AsQSzQNem1kAgfuJAaPDvQDPAxECot9ZAEqvbQOvKsUD+DftACKfJQKhJt0AtorNANDD8QD\u002fG60DCT9lAZpPLQEpBA0Ed\u002f8NAOybHQDi4rEAe5eVAZJ6eQCVq1EB12uxAU8rQQGqJ2EDa4LdAI\u002f7iQLjfzUCuYqNATKGoQIoQ8UBezrZAKa3AQMylz0BgAuJAUiSuQI9a6UAbE6xAACvTQBCer0BEFdxA1Vi\u002fQIZW0EDs6uJAGZEBQa6P+EDBC8tAtm64QGVfxUBpg7NAdnjAQJij9kAsBuhAsxLmQM8cxUCpJ8BAQNWmQDM80EAnhN1A2G\u002fZQEFi6UDHDsxALeX6QFUpxkDyWe9AZFfuQIBbskBajAFBihn8QP4MvUDtQc9AwyvjQA2frkCp2uFAeFv4QEd74UCSLcxAny65QIp6wkBRyNNAOrTLQFzX4kAk07hAqnntQM01yUBndNFAv7fFQDYP+EDDng5BCjG4QAyz10B8AtJAsrbSQDwbzUC+CMVAMFbVQIFL0kCp6KxAowzlQASq00A+8wZB32L5QBrd0EAcAfBA5ivFQI\u002f0x0BeddRAbaTBQPIRo0CMs6VA2WS4QPFjuEDHjfFAm3z+QOr4vECJ8c5AfNefQPPv0UAm4wpB0Wi\u002fQCwFAUFL5ctAaH\u002f4QPgM6EDXefJAtgUKQR8I70DAW8RABevTQCQRvkAV2bhAlErcQJaVB0GGFgdBMbHVQD6wCkF02cxAdq+2QNZZAkG7xsFALCTcQO06t0DQpcZA6XnHQLfc50BB9LlAeHPrQKj6uEAoOexAuVffQJ9M\u002fkC8iahAPUueQBdFzEDBw65AJtMHQV7L8kBrt7ZAcxAIQXDy1EAgnbNA"},"yaxis":"y","type":"scattergl"},{"customdata":[["5",550],["5",1541],["5",1368],["5",980],["5",1213],["5",1458],["5",1249],["5",776],["5",1461],["5",818],["5",1185],["5",1295],["5",1313],["5",1472],["5",1275],["5",1222],["5",584],["5",1303],["5",703],["5",1188],["5",1316],["5",1071],["5",818],["5",1045],["5",1153],["5",1213],["5",389],["5",862],["5",1496],["5",1215],["5",808],["5",1393],["5",1121],["5",1321],["5",1498],["5",1412],["5",581],["5",1317],["5",1280],["5",1277],["5",1321],["5",1418],["5",1550],["5",1109],["5",1024],["5",1078],["5",1519],["5",1662],["5",1273],["5",1079],["5",1407],["5",1272],["5",940],["5",1102],["5",1334],["5",837],["5",1582],["5",1659],["5",1515],["5",1267],["5",1558],["5",1320],["5",901],["5",1320],["5",586],["5",669],["5",963],["5",1687],["5",1252],["5",1049],["5",463],["5",1136],["5",1195],["5",1262],["5",1463],["5",992],["5",1434],["5",1298],["5",1528],["5",761],["5",1690],["5",1464],["5",1273],["5",1361],["5",1408],["5",1546],["5",1509],["5",1131],["5",1416],["5",1446],["5",1323],["5",1181],["5",1290],["5",1176],["5",906],["5",1208],["5",1375],["5",1200],["5",797],["5",1554],["5",1548],["5",1526],["5",1396],["5",1058],["5",1466],["5",953],["5",1362],["5",1502],["5",1390],["5",1507],["5",1618],["5",1258],["5",1124],["5",1396],["5",1339],["5",1517],["5",1207],["5",1100],["5",1269],["5",907],["5",1477],["5",1064],["5",1169],["5",1416],["5",1383],["5",845],["5",1262],["5",1127],["5",956],["5",1371],["5",1521],["5",1433],["5",696],["5",964],["5",982],["5",1557],["5",1237],["5",503],["5",1479],["5",1332],["5",1368],["5",1147],["5",732],["5",394],["5",840],["5",969],["5",717],["5",879],["5",914],["5",1266]],"hovertemplate":"cell_type=FCGR3A+ Mono\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"FCGR3A+ Mono","marker":{"color":"#FFA15A","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"FCGR3A+ Mono","showlegend":true,"x":{"dtype":"f4","bdata":"7tpKQaxC9r+uy0JB3fxBQSpRTUEnQUZB5nRBQRdlRUF3NFBBAD5RQbH5PUFquklB7ppKQW+gQ0HGmERBmEM7QRT0TEG+JzpBmyYnQVe\u002fRkF5ClBBLxU\u002fQQ3\u002fUUFyuklBHzI+QRVVPUFCHUtBoolDQQjbPEG4qz9BXFFIQfUEOEFum0pBdf9FQWXtQ0HDWT1BtHBCQZpYS0F9RjdBOF1QQe72Q0GayEpBkTZTQYrIRUG8Lk1B26hCQQw7TkG0MDlBWvVFQacCREEAID9Bls1EQb7VSUG++DxB0aNHQTHYSUEPGEFBwqE3QeXXRUGQHTZBfedNQYlnS0F0dT5BbnVMQfp3TEHY6U5B1ONIQfG3UkF5u0NBSPhCQdpsBcDLLUVBtLA8QYp2R0EXKEhBpxNHQRe7OEEjoExBpvJAQeu+JEE8kD1B14k8Qb8dQEEGWUZBzII\u002fQXLdO0GlTjpBWdQ9QblFR0HBVkRBS7BGQctuOEGvx0tBpZtDQYbwPUH6MkBBoSFOQQ5LRkGtATxBBb1SQVdVQEGrCz1BBU9QQXZYQUHWmEFBhZc7QdvPS0G5mDxBNFU7QV1mQUFkJ0RBhTs7QfwAQkFnI0RB0ac9QUw3QkFUM09B6RNEQVoBP0HMTz5BaLpFQXBLOUExR0ZBrfBNQQ06QEGigEJBMd9HQWSYT0GbnEtBSGBTQVXSPkGgUUFBXT1KQaLfTkH5U0FBjqI\u002fQajbPEFE20tBIGpBQXp7LkEz6UVBQ4g+QSy7TEECA05BfZBHQZYkQkEufUdBzYc6QdpFQEHm5kFB"},"xaxis":"x","y":{"dtype":"f4","bdata":"RhwTQUeSK0C\u002fSihB4kIUQQlxGkHociBByg4WQQ3RFUEDARVBo60OQfpLE0FA5yBBS+4SQTR7IEFqJhNBVeMgQSC\u002fC0GWPR9BFG0XQR1aDUFDjBFBq5gYQTJIFUH5axJB2X4aQT0LFUG3TQ5BoUkPQZ5BHkGdGhhBuAYdQTC2EUF\u002fHRdBZ+YRQSWCHUFOtSNBTEISQVLqEEHUiBlBGogbQekjJUHROBZBLFQSQfdICEEMJhxBnCsNQWGzGkGpPB1B7BgZQW08BUHpdQxB\u002f6YfQfCaDUGcKxJBiXocQYf2C0G1ciJBWgojQY4QJEHYWBlB9vQSQbf5BkFz6QxBHLIXQbvTC0FW7RNBSjgZQRqAFkHCJxZBW1QaQQhrPEAL8hFBiWsbQaoiD0HtOh5B4DEZQUFNDkEBnR9BlO8SQdLyDkEIECBB+OAhQWx1GkHmIxZBTDogQdDtH0HzbSJBrEgWQcJXIUFuSiRBtmUjQWe9FUFLAiBBU48PQVB4D0ET7iRB4d8aQYHDGkHNZBhBfqEaQfLSI0EBjR9BJ\u002fMbQWyDBkFjPh5ByRAPQSnCI0GtVRNBzyQiQVLDHEGLeSZBZvwZQTOMIUGFtiBB2FMqQRjPJEHn6xlBVcoPQR8qH0G5+A5BnEQgQU0OFkHIUAZBjxkUQUoWIUEGjw5BltwdQaXJHEGf6QxBhLcWQVV\u002fHUFLzSRBeqMPQWm4CkGMcRhB\u002fwsiQR9rG0HCEgVBeuMcQcyyG0HvhxBB1G8MQV\u002f9CEHyjBtBHokXQc3gHEEpDhZBWNEVQSUkEEGXgCRB"},"yaxis":"y","type":"scattergl"},{"customdata":[["6",1078],["6",1871],["6",1266],["6",1313],["6",1852],["6",1991],["6",1414],["6",1018],["6",1605],["6",1173],["6",1859],["6",1342],["6",1647],["6",1028],["6",1974],["6",1455],["6",1445],["6",1571],["6",1627],["6",1749],["6",995],["6",881],["6",1625],["6",1425],["6",2013],["6",1643],["6",1265],["6",1094],["6",1902],["6",1906],["6",1602],["6",1782],["6",751],["6",1792],["6",1560],["6",1539]],"hovertemplate":"cell_type=Dendritic\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"Dendritic","marker":{"color":"#19d3f3","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"Dendritic","showlegend":true,"x":{"dtype":"f4","bdata":"QDISQYr4CUFKaBlBfaoWQT9M8kD8VwVBlYIOQdolGUG3dAxBqoETQZB+DUEf2RZBs7sXQX5DGUEM8\u002f1ATFshQZ05EUFOEwhBiPoKQRlEDUEjCx5BiUweQc7EAkHTRBJBcA0BQZMMD0FvrQJB\u002fuYQQelt+UBL2whBfhUOQaROC0HWJx1BgiUJQZV3A0Et0\u002flA"},"xaxis":"x","y":{"dtype":"f4","bdata":"vViVQAxXi0AqvZpA+leXQGb\u002fXEBfkoRAA2GOQBcnl0AFJY1AbpyYQOz2j0DciKJAITWkQIOFo0A\u002fTG5AFSOlQGx+kUAiuIdA0WGTQNKUjkBKGqxABVerQO+4fEAMn5tAmc98QPuhkkD\u002ffm5AHvKUQCw1cEAyuopAwveOQBvSj0D96qxA+HaJQLAOgUDXF2FA"},"yaxis":"y","type":"scattergl"},{"customdata":[["7",338],["7",2413],["7",273],["7",366],["7",345],["7",266],["7",849],["7",979],["7",278],["7",212],["7",359],["7",394],["7",321]],"hovertemplate":"cell_type=Megakaryocyte\u003cbr\u003eUMAP1=%{x}\u003cbr\u003eUMAP2=%{y}\u003cbr\u003eleiden=%{customdata[0]}\u003cbr\u003en_genes=%{customdata[1]}\u003cextra\u003e\u003c\u002fextra\u003e","legendgroup":"Megakaryocyte","marker":{"color":"#FF6692","opacity":0.8,"symbol":"circle","size":4},"mode":"markers","name":"Megakaryocyte","showlegend":true,"x":{"dtype":"f4","bdata":"nQMOQYj+DkFkbhNBeHcOQSOIEUFz+g9B7YANQTjTGUFMeRJB8jsTQSpVE0GHLhBBNvIRQQ=="},"xaxis":"x","y":{"dtype":"f4","bdata":"WPAgQeJkIEGfQh9Bm60hQc67HkHauB5Bd\u002fMgQVFDHUE+DyBBzYMeQfMCHUH4rx5ByywfQQ=="},"yaxis":"y","type":"scattergl"}],                        {"template":{"data":{"barpolar":[{"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"barpolar"}],"bar":[{"error_x":{"color":"#2a3f5f"},"error_y":{"color":"#2a3f5f"},"marker":{"line":{"color":"white","width":0.5},"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"bar"}],"carpet":[{"aaxis":{"endlinecolor":"#2a3f5f","gridcolor":"#C8D4E3","linecolor":"#C8D4E3","minorgridcolor":"#C8D4E3","startlinecolor":"#2a3f5f"},"baxis":{"endlinecolor":"#2a3f5f","gridcolor":"#C8D4E3","linecolor":"#C8D4E3","minorgridcolor":"#C8D4E3","startlinecolor":"#2a3f5f"},"type":"carpet"}],"choropleth":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"choropleth"}],"contourcarpet":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"contourcarpet"}],"contour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"contour"}],"heatmap":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"heatmap"}],"histogram2dcontour":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2dcontour"}],"histogram2d":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"histogram2d"}],"histogram":[{"marker":{"pattern":{"fillmode":"overlay","size":10,"solidity":0.2}},"type":"histogram"}],"mesh3d":[{"colorbar":{"outlinewidth":0,"ticks":""},"type":"mesh3d"}],"parcoords":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"parcoords"}],"pie":[{"automargin":true,"type":"pie"}],"scatter3d":[{"line":{"colorbar":{"outlinewidth":0,"ticks":""}},"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatter3d"}],"scattercarpet":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattercarpet"}],"scattergeo":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergeo"}],"scattergl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattergl"}],"scattermapbox":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermapbox"}],"scattermap":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scattermap"}],"scatterpolargl":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolargl"}],"scatterpolar":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterpolar"}],"scatter":[{"fillpattern":{"fillmode":"overlay","size":10,"solidity":0.2},"type":"scatter"}],"scatterternary":[{"marker":{"colorbar":{"outlinewidth":0,"ticks":""}},"type":"scatterternary"}],"surface":[{"colorbar":{"outlinewidth":0,"ticks":""},"colorscale":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"type":"surface"}],"table":[{"cells":{"fill":{"color":"#EBF0F8"},"line":{"color":"white"}},"header":{"fill":{"color":"#C8D4E3"},"line":{"color":"white"}},"type":"table"}]},"layout":{"annotationdefaults":{"arrowcolor":"#2a3f5f","arrowhead":0,"arrowwidth":1},"autotypenumbers":"strict","coloraxis":{"colorbar":{"outlinewidth":0,"ticks":""}},"colorscale":{"diverging":[[0,"#8e0152"],[0.1,"#c51b7d"],[0.2,"#de77ae"],[0.3,"#f1b6da"],[0.4,"#fde0ef"],[0.5,"#f7f7f7"],[0.6,"#e6f5d0"],[0.7,"#b8e186"],[0.8,"#7fbc41"],[0.9,"#4d9221"],[1,"#276419"]],"sequential":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]],"sequentialminus":[[0.0,"#0d0887"],[0.1111111111111111,"#46039f"],[0.2222222222222222,"#7201a8"],[0.3333333333333333,"#9c179e"],[0.4444444444444444,"#bd3786"],[0.5555555555555556,"#d8576b"],[0.6666666666666666,"#ed7953"],[0.7777777777777778,"#fb9f3a"],[0.8888888888888888,"#fdca26"],[1.0,"#f0f921"]]},"colorway":["#636efa","#EF553B","#00cc96","#ab63fa","#FFA15A","#19d3f3","#FF6692","#B6E880","#FF97FF","#FECB52"],"font":{"color":"#2a3f5f"},"geo":{"bgcolor":"white","lakecolor":"white","landcolor":"white","showlakes":true,"showland":true,"subunitcolor":"#C8D4E3"},"hoverlabel":{"align":"left"},"hovermode":"closest","mapbox":{"style":"light"},"margin":{"b":0,"l":0,"r":0,"t":30},"paper_bgcolor":"white","plot_bgcolor":"white","polar":{"angularaxis":{"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":""},"bgcolor":"white","radialaxis":{"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":""}},"scene":{"xaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"},"yaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"},"zaxis":{"backgroundcolor":"white","gridcolor":"#DFE8F3","gridwidth":2,"linecolor":"#EBF0F8","showbackground":true,"ticks":"","zerolinecolor":"#EBF0F8"}},"shapedefaults":{"line":{"color":"#2a3f5f"}},"ternary":{"aaxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""},"baxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""},"bgcolor":"white","caxis":{"gridcolor":"#DFE8F3","linecolor":"#A2B1C6","ticks":""}},"title":{"x":0.05},"xaxis":{"automargin":true,"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":"","title":{"standoff":15},"zerolinecolor":"#EBF0F8","zerolinewidth":2},"yaxis":{"automargin":true,"gridcolor":"#EBF0F8","linecolor":"#EBF0F8","ticks":"","title":{"standoff":15},"zerolinecolor":"#EBF0F8","zerolinewidth":2}}},"xaxis":{"anchor":"y","domain":[0.0,1.0],"title":{"text":"UMAP1"}},"yaxis":{"anchor":"x","domain":[0.0,1.0],"title":{"text":"UMAP2"}},"legend":{"title":{"text":"Cell type"},"tracegroupgap":0},"title":{"text":"3k PBMCs \u2014 interactive UMAP"},"height":600,"width":820},                        {"responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('4a610c96-2fe8-44a6-ac07-f3a6b30f0427');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-plotly-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;6: Interactive UMAP — hover, zoom, and toggle cell types.
+</figcaption>
+</figure>
+</div>
+</div>
+</section>
+<section id="interpretation-caveats" class="level2">
+<h2 class="anchored" data-anchor-id="interpretation-caveats">8 · Interpretation &amp; caveats</h2>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>What this means — and what I would <em>not</em> conclude
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The pipeline cleanly resolves seven canonical PBMC populations — CD4 T cells, both monocyte subsets (classical CD14+ and non-classical FCGR3A+), B cells, NK cells, dendritic cells, and a small megakaryocyte/platelet cluster — each supported by textbook markers in the dot-plot. CD8 T cells sit adjacent to CD4 T cells and are <em>not</em> split at this depth — an honest limitation of a shallow 3k dataset, flagged rather than papered over. That internal consistency is the real quality signal: the clusters are <em>biologically interpretable</em>, not just statistically distinct.</p>
+<p><strong>Caveats a careful analyst flags:</strong> (1) cluster boundaries depend on the Leiden <em>resolution</em> — 1.0 here separates seven lineages but leaves CD8 T adjacent to CD4 T; lowering it further merges the non-classical monocytes into NK, while raising it can split CD8 out at the cost of stability and spurious clusters — so resolution should be chosen against the biological question, not by default. (2) Marker-score annotation labels a cluster by its <em>best</em> match — rare or transitional states can be absorbed into a neighbour; reference-based tools (e.g.&nbsp;CellTypist) are the next step when labels must be defensible. (3) This is a single healthy donor: no batch, no condition, so no differential abundance/expression claims are made here. (4) Doublets were handled only via the upper gene-count filter; a dedicated detector (Scrublet) is warranted on real multi-sample data.</p>
+<p><strong>What I’d do with your data:</strong> confirm the biological question first (atlas vs comparison), tune QC/resolution to it, add doublet detection and — for multi-sample designs — integration (Harmony/scVI) before any cross-condition comparison.</p>
+</div>
+</div>
+</section>
+<section id="result" class="level2">
+<h2 class="anchored" data-anchor-id="result">9 · Result</h2>
+<div id="cell-save" class="cell" data-execution_count="13">
+<div id="save" class="cell-output cell-output-display cell-output-markdown" data-execution_count="13">
+<p>Starting from a raw 10x matrix, the pipeline resolved <strong>2,638 quality-controlled cells</strong> into <strong>8 clusters</strong> spanning <strong>7 recognisable PBMC cell types</strong>, each validated by canonical markers. Outputs (annotated <code>.h5ad</code>, marker tables, composition) are written to <code>results/</code>.</p>
+</div>
+</div>
+<p><strong>What a client gets:</strong> an annotated object ready for downstream work, a composition table, publication-quality figures, an interactive explorer, and this fully reproducible report. <strong>What stays mine:</strong> the parametrised, batch-capable version that runs this on <em>your</em> data with automated QC tuning — that lives in a private engine.</p>
+<hr>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center collapsed" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Session info
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<div id="f44153c8" class="cell" data-execution_count="14">
+<div class="cell-output cell-output-stdout">
+<pre><code>Python 3.11.15
+scanpy       1.11.5
+anndata      0.12.16
+numpy        2.4.6
+pandas       2.3.3
+plotly       6.8.0
+leidenalg    0.12.0</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- -->
+
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb20" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Single-cell RNA-seq: from raw 10x counts to annotated cell types"</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "3k PBMCs — QC → clustering → cell-type annotation, fully reproducible"</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="an">author:</span><span class="co"> "Peter Ristow, PhD — Principal Scientist (NGS)"</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="an">date:</span><span class="co"> today</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="an">jupyter:</span><span class="co"> python3</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; **The question.** A 10x Genomics run gives you a sparse matrix of ~2,700 cells ×</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; ~32,000 genes and *no labels*. Which immune cell types are present, in what</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; proportions, and what genes define them? This report takes the raw count matrix</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; end-to-end to an annotated UMAP — every step reproducible with one command.</span></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a><span class="at">&gt;</span></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; *Roche Principal Scientist (NGS) &amp; PhD — I turn sequencing data into clean, reproducible answers.*</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>::: {.callout-note collapse="true"}</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a><span class="fu">## How to reproduce this (one command)</span></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a><span class="in">```bash</span></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/pgristow/scrnaseq-pbmc-scanpy</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> scrnaseq-pbmc-scanpy</span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a><span class="ex">conda</span> env create <span class="at">-f</span> environment.yml <span class="kw">&amp;&amp;</span> <span class="ex">conda</span> activate sc-pbmc</span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> all        <span class="co"># downloads data, runs analysis, renders this report</span></span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>Or with Docker: <span class="in">`docker build -t scpbmc . &amp;&amp; docker run --rm -v "$PWD":/work scpbmc make all`</span>.</span>
+<span id="cb20-25"><a href="#cb20-25" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb20-26"><a href="#cb20-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-27"><a href="#cb20-27" aria-hidden="true" tabindex="-1"></a><span class="fu">### The pipeline at a glance</span></span>
+<span id="cb20-28"><a href="#cb20-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-31"><a href="#cb20-31" aria-hidden="true" tabindex="-1"></a><span class="in">```{mermaid}</span></span>
+<span id="cb20-32"><a href="#cb20-32" aria-hidden="true" tabindex="-1"></a>%%| label: fig-pipeline</span>
+<span id="cb20-33"><a href="#cb20-33" aria-hidden="true" tabindex="-1"></a>flowchart LR</span>
+<span id="cb20-34"><a href="#cb20-34" aria-hidden="true" tabindex="-1"></a>    A[Raw <span class="dv">10</span>x matrix&lt;br/&gt;<span class="fl">2.7</span>k cells] --&gt; B[QC filter&lt;br/&gt;genes / counts / <span class="dt">%mito</span>]</span>
+<span id="cb20-35"><a href="#cb20-35" aria-hidden="true" tabindex="-1"></a>    B --&gt; C[Normalize + log1p]</span>
+<span id="cb20-36"><a href="#cb20-36" aria-hidden="true" tabindex="-1"></a>    C --&gt; D[Highly variable genes]</span>
+<span id="cb20-37"><a href="#cb20-37" aria-hidden="true" tabindex="-1"></a>    D --&gt; E[PCA → neighbours]</span>
+<span id="cb20-38"><a href="#cb20-38" aria-hidden="true" tabindex="-1"></a>    E --&gt; F[UMAP embedding]</span>
+<span id="cb20-39"><a href="#cb20-39" aria-hidden="true" tabindex="-1"></a>    E --&gt; G[Leiden clustering]</span>
+<span id="cb20-40"><a href="#cb20-40" aria-hidden="true" tabindex="-1"></a>    G --&gt; H[Marker genes&lt;br/&gt;Wilcoxon]</span>
+<span id="cb20-41"><a href="#cb20-41" aria-hidden="true" tabindex="-1"></a>    H --&gt; I[Cell-type annotation&lt;br/&gt;canonical markers]</span>
+<span id="cb20-42"><a href="#cb20-42" aria-hidden="true" tabindex="-1"></a>    F --&gt; I</span>
+<span id="cb20-43"><a href="#cb20-43" aria-hidden="true" tabindex="-1"></a>    I --&gt; J[Annotated .h5ad&lt;br/&gt;+ figures + report]</span>
+<span id="cb20-44"><a href="#cb20-44" aria-hidden="true" tabindex="-1"></a>    classDef out fill:<span class="co">#e8f5e9,stroke:#2e7d32;</span></span>
+<span id="cb20-45"><a href="#cb20-45" aria-hidden="true" tabindex="-1"></a>    class J out;</span>
+<span id="cb20-46"><a href="#cb20-46" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-47"><a href="#cb20-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-48"><a href="#cb20-48" aria-hidden="true" tabindex="-1"></a><span class="fu">## 1 · Data</span></span>
+<span id="cb20-49"><a href="#cb20-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-50"><a href="#cb20-50" aria-hidden="true" tabindex="-1"></a>The dataset is the canonical **10x Genomics 3k PBMC** sample (peripheral blood</span>
+<span id="cb20-51"><a href="#cb20-51" aria-hidden="true" tabindex="-1"></a>mononuclear cells from a healthy donor) — the standard reference for single-cell</span>
+<span id="cb20-52"><a href="#cb20-52" aria-hidden="true" tabindex="-1"></a>method validation. We read the raw filtered cell-by-gene matrix.</span>
+<span id="cb20-53"><a href="#cb20-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-56"><a href="#cb20-56" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-57"><a href="#cb20-57" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: setup</span></span>
+<span id="cb20-58"><a href="#cb20-58" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scanpy <span class="im">as</span> sc</span>
+<span id="cb20-59"><a href="#cb20-59" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb20-60"><a href="#cb20-60" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb20-61"><a href="#cb20-61" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb20-62"><a href="#cb20-62" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pathlib <span class="im">import</span> Path</span>
+<span id="cb20-63"><a href="#cb20-63" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-64"><a href="#cb20-64" aria-hidden="true" tabindex="-1"></a>sc.settings.verbosity <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb20-65"><a href="#cb20-65" aria-hidden="true" tabindex="-1"></a>sc.settings.set_figure_params(dpi<span class="op">=</span><span class="dv">90</span>, facecolor<span class="op">=</span><span class="st">"white"</span>, frameon<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-66"><a href="#cb20-66" aria-hidden="true" tabindex="-1"></a>plt.rcParams[<span class="st">"figure.figsize"</span>] <span class="op">=</span> (<span class="dv">6</span>, <span class="dv">5</span>)</span>
+<span id="cb20-67"><a href="#cb20-67" aria-hidden="true" tabindex="-1"></a>Path(<span class="st">"results"</span>).mkdir(exist_ok<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb20-68"><a href="#cb20-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-69"><a href="#cb20-69" aria-hidden="true" tabindex="-1"></a>DATA_DIR <span class="op">=</span> <span class="st">"data/filtered_gene_bc_matrices/hg19/"</span></span>
+<span id="cb20-70"><a href="#cb20-70" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> sc.read_10x_mtx(DATA_DIR, var_names<span class="op">=</span><span class="st">"gene_symbols"</span>, cache<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb20-71"><a href="#cb20-71" aria-hidden="true" tabindex="-1"></a>adata.var_names_make_unique()</span>
+<span id="cb20-72"><a href="#cb20-72" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Loaded </span><span class="sc">{</span>adata<span class="sc">.</span>n_obs<span class="sc">:,}</span><span class="ss"> cells × </span><span class="sc">{</span>adata<span class="sc">.</span>n_vars<span class="sc">:,}</span><span class="ss"> genes"</span>)</span>
+<span id="cb20-73"><a href="#cb20-73" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-74"><a href="#cb20-74" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-75"><a href="#cb20-75" aria-hidden="true" tabindex="-1"></a><span class="fu">## 2 · Quality control</span></span>
+<span id="cb20-76"><a href="#cb20-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-77"><a href="#cb20-77" aria-hidden="true" tabindex="-1"></a>Empty droplets, dying cells, and doublets distort every downstream step. We compute</span>
+<span id="cb20-78"><a href="#cb20-78" aria-hidden="true" tabindex="-1"></a>standard QC metrics and filter on three intuitive thresholds: a minimum number of</span>
+<span id="cb20-79"><a href="#cb20-79" aria-hidden="true" tabindex="-1"></a>detected genes per cell, a maximum (to drop likely doublets), and a ceiling on the</span>
+<span id="cb20-80"><a href="#cb20-80" aria-hidden="true" tabindex="-1"></a>mitochondrial fraction (high values flag stressed/dying cells).</span>
+<span id="cb20-81"><a href="#cb20-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-84"><a href="#cb20-84" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-85"><a href="#cb20-85" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: qc-metrics</span></span>
+<span id="cb20-86"><a href="#cb20-86" aria-hidden="true" tabindex="-1"></a>sc.pp.filter_cells(adata, min_genes<span class="op">=</span><span class="dv">200</span>)</span>
+<span id="cb20-87"><a href="#cb20-87" aria-hidden="true" tabindex="-1"></a>sc.pp.filter_genes(adata, min_cells<span class="op">=</span><span class="dv">3</span>)</span>
+<span id="cb20-88"><a href="#cb20-88" aria-hidden="true" tabindex="-1"></a>adata.var[<span class="st">"mt"</span>] <span class="op">=</span> adata.var_names.<span class="bu">str</span>.startswith(<span class="st">"MT-"</span>)</span>
+<span id="cb20-89"><a href="#cb20-89" aria-hidden="true" tabindex="-1"></a>sc.pp.calculate_qc_metrics(adata, qc_vars<span class="op">=</span>[<span class="st">"mt"</span>], inplace<span class="op">=</span><span class="va">True</span>, percent_top<span class="op">=</span><span class="va">None</span>, log1p<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-90"><a href="#cb20-90" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-91"><a href="#cb20-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-94"><a href="#cb20-94" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-95"><a href="#cb20-95" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-qc-violin</span></span>
+<span id="cb20-96"><a href="#cb20-96" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "QC distributions before filtering. Each point is a cell."</span></span>
+<span id="cb20-97"><a href="#cb20-97" aria-hidden="true" tabindex="-1"></a>sc.pl.violin(</span>
+<span id="cb20-98"><a href="#cb20-98" aria-hidden="true" tabindex="-1"></a>    adata, [<span class="st">"n_genes_by_counts"</span>, <span class="st">"total_counts"</span>, <span class="st">"pct_counts_mt"</span>],</span>
+<span id="cb20-99"><a href="#cb20-99" aria-hidden="true" tabindex="-1"></a>    jitter<span class="op">=</span><span class="fl">0.4</span>, multi_panel<span class="op">=</span><span class="va">True</span>, show<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb20-100"><a href="#cb20-100" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-101"><a href="#cb20-101" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb20-102"><a href="#cb20-102" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-103"><a href="#cb20-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-106"><a href="#cb20-106" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-107"><a href="#cb20-107" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: qc-filter</span></span>
+<span id="cb20-108"><a href="#cb20-108" aria-hidden="true" tabindex="-1"></a>n_before <span class="op">=</span> adata.n_obs</span>
+<span id="cb20-109"><a href="#cb20-109" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> adata[adata.obs.n_genes_by_counts <span class="op">&lt;</span> <span class="dv">2500</span>, :].copy()</span>
+<span id="cb20-110"><a href="#cb20-110" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> adata[adata.obs.pct_counts_mt <span class="op">&lt;</span> <span class="dv">5</span>, :].copy()</span>
+<span id="cb20-111"><a href="#cb20-111" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Kept </span><span class="sc">{</span>adata<span class="sc">.</span>n_obs<span class="sc">:,}</span><span class="ss"> / </span><span class="sc">{</span>n_before<span class="sc">:,}</span><span class="ss"> cells after QC "</span></span>
+<span id="cb20-112"><a href="#cb20-112" aria-hidden="true" tabindex="-1"></a>      <span class="ss">f"(</span><span class="sc">{</span><span class="dv">100</span><span class="op">*</span>adata<span class="sc">.</span>n_obs<span class="op">/</span>n_before<span class="sc">:.1f}</span><span class="ss">%)."</span>)</span>
+<span id="cb20-113"><a href="#cb20-113" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-114"><a href="#cb20-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-115"><a href="#cb20-115" aria-hidden="true" tabindex="-1"></a><span class="fu">## 3 · Normalization &amp; feature selection</span></span>
+<span id="cb20-116"><a href="#cb20-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-117"><a href="#cb20-117" aria-hidden="true" tabindex="-1"></a>Counts are normalized to a common library size, log-transformed, and we keep the</span>
+<span id="cb20-118"><a href="#cb20-118" aria-hidden="true" tabindex="-1"></a>most variable genes — the biological signal that separates cell types from</span>
+<span id="cb20-119"><a href="#cb20-119" aria-hidden="true" tabindex="-1"></a>technical noise.</span>
+<span id="cb20-120"><a href="#cb20-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-123"><a href="#cb20-123" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-124"><a href="#cb20-124" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: normalize</span></span>
+<span id="cb20-125"><a href="#cb20-125" aria-hidden="true" tabindex="-1"></a>sc.pp.normalize_total(adata, target_sum<span class="op">=</span><span class="fl">1e4</span>)</span>
+<span id="cb20-126"><a href="#cb20-126" aria-hidden="true" tabindex="-1"></a>sc.pp.log1p(adata)</span>
+<span id="cb20-127"><a href="#cb20-127" aria-hidden="true" tabindex="-1"></a>adata.raw <span class="op">=</span> adata  <span class="co"># keep full log-normalized matrix for marker plotting/annotation</span></span>
+<span id="cb20-128"><a href="#cb20-128" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-129"><a href="#cb20-129" aria-hidden="true" tabindex="-1"></a>sc.pp.highly_variable_genes(adata, min_mean<span class="op">=</span><span class="fl">0.0125</span>, max_mean<span class="op">=</span><span class="dv">3</span>, min_disp<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb20-130"><a href="#cb20-130" aria-hidden="true" tabindex="-1"></a>n_hvg <span class="op">=</span> <span class="bu">int</span>(adata.var.highly_variable.<span class="bu">sum</span>())</span>
+<span id="cb20-131"><a href="#cb20-131" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> adata[:, adata.var.highly_variable].copy()</span>
+<span id="cb20-132"><a href="#cb20-132" aria-hidden="true" tabindex="-1"></a>sc.pp.regress_out(adata, [<span class="st">"total_counts"</span>, <span class="st">"pct_counts_mt"</span>])</span>
+<span id="cb20-133"><a href="#cb20-133" aria-hidden="true" tabindex="-1"></a>sc.pp.scale(adata, max_value<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb20-134"><a href="#cb20-134" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Selected </span><span class="sc">{</span>n_hvg<span class="sc">}</span><span class="ss"> highly variable genes for clustering."</span>)</span>
+<span id="cb20-135"><a href="#cb20-135" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-136"><a href="#cb20-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-137"><a href="#cb20-137" aria-hidden="true" tabindex="-1"></a><span class="fu">## 4 · Dimensionality reduction &amp; clustering</span></span>
+<span id="cb20-138"><a href="#cb20-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-139"><a href="#cb20-139" aria-hidden="true" tabindex="-1"></a>PCA compresses the data; a neighbour graph then drives both the UMAP embedding</span>
+<span id="cb20-140"><a href="#cb20-140" aria-hidden="true" tabindex="-1"></a>(for visualization) and Leiden community detection (for clustering).</span>
+<span id="cb20-141"><a href="#cb20-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-144"><a href="#cb20-144" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-145"><a href="#cb20-145" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: cluster</span></span>
+<span id="cb20-146"><a href="#cb20-146" aria-hidden="true" tabindex="-1"></a>sc.tl.pca(adata, svd_solver<span class="op">=</span><span class="st">"arpack"</span>)</span>
+<span id="cb20-147"><a href="#cb20-147" aria-hidden="true" tabindex="-1"></a>sc.pp.neighbors(adata, n_neighbors<span class="op">=</span><span class="dv">10</span>, n_pcs<span class="op">=</span><span class="dv">40</span>)</span>
+<span id="cb20-148"><a href="#cb20-148" aria-hidden="true" tabindex="-1"></a>sc.tl.umap(adata)</span>
+<span id="cb20-149"><a href="#cb20-149" aria-hidden="true" tabindex="-1"></a>sc.tl.leiden(adata, resolution<span class="op">=</span><span class="fl">1.0</span>, flavor<span class="op">=</span><span class="st">"igraph"</span>, n_iterations<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb20-150"><a href="#cb20-150" aria-hidden="true" tabindex="-1"></a>             directed<span class="op">=</span><span class="va">False</span>, random_state<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb20-151"><a href="#cb20-151" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Leiden found </span><span class="sc">{</span>adata<span class="sc">.</span>obs<span class="sc">.</span>leiden<span class="sc">.</span>nunique()<span class="sc">}</span><span class="ss"> clusters."</span>)</span>
+<span id="cb20-152"><a href="#cb20-152" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-153"><a href="#cb20-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-156"><a href="#cb20-156" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-157"><a href="#cb20-157" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-umap-leiden</span></span>
+<span id="cb20-158"><a href="#cb20-158" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "UMAP coloured by unsupervised Leiden cluster."</span></span>
+<span id="cb20-159"><a href="#cb20-159" aria-hidden="true" tabindex="-1"></a>sc.pl.umap(adata, color<span class="op">=</span><span class="st">"leiden"</span>, legend_loc<span class="op">=</span><span class="st">"on data"</span>, title<span class="op">=</span><span class="st">"Leiden clusters"</span>, show<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-160"><a href="#cb20-160" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb20-161"><a href="#cb20-161" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-162"><a href="#cb20-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-163"><a href="#cb20-163" aria-hidden="true" tabindex="-1"></a><span class="fu">## 5 · Marker genes</span></span>
+<span id="cb20-164"><a href="#cb20-164" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-165"><a href="#cb20-165" aria-hidden="true" tabindex="-1"></a>For each cluster we rank genes that are over-expressed relative to all other cells</span>
+<span id="cb20-166"><a href="#cb20-166" aria-hidden="true" tabindex="-1"></a>(Wilcoxon test). These ranked markers are the evidence base for annotation.</span>
+<span id="cb20-167"><a href="#cb20-167" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-170"><a href="#cb20-170" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-171"><a href="#cb20-171" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: rank-genes</span></span>
+<span id="cb20-172"><a href="#cb20-172" aria-hidden="true" tabindex="-1"></a>sc.tl.rank_genes_groups(adata, <span class="st">"leiden"</span>, method<span class="op">=</span><span class="st">"wilcoxon"</span>)</span>
+<span id="cb20-173"><a href="#cb20-173" aria-hidden="true" tabindex="-1"></a>top <span class="op">=</span> sc.get.rank_genes_groups_df(adata, group<span class="op">=</span><span class="va">None</span>).groupby(<span class="st">"group"</span>, observed<span class="op">=</span><span class="va">True</span>).head(<span class="dv">5</span>)</span>
+<span id="cb20-174"><a href="#cb20-174" aria-hidden="true" tabindex="-1"></a>top.to_csv(<span class="st">"results/top_markers_per_cluster.csv"</span>, index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-175"><a href="#cb20-175" aria-hidden="true" tabindex="-1"></a>top.pivot_table(index<span class="op">=</span><span class="st">"group"</span>, values<span class="op">=</span><span class="st">"names"</span>, aggfunc<span class="op">=</span><span class="kw">lambda</span> s: <span class="st">", "</span>.join(s)).rename(</span>
+<span id="cb20-176"><a href="#cb20-176" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>{<span class="st">"names"</span>: <span class="st">"top 5 markers"</span>})</span>
+<span id="cb20-177"><a href="#cb20-177" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-178"><a href="#cb20-178" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-179"><a href="#cb20-179" aria-hidden="true" tabindex="-1"></a><span class="fu">## 6 · Cell-type annotation (data-driven)</span></span>
+<span id="cb20-180"><a href="#cb20-180" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-181"><a href="#cb20-181" aria-hidden="true" tabindex="-1"></a>Rather than hand-label cluster numbers (which is fragile), we score each cell against</span>
+<span id="cb20-182"><a href="#cb20-182" aria-hidden="true" tabindex="-1"></a>canonical PBMC marker panels and assign every cluster the **best-matching** lineage by</span>
+<span id="cb20-183"><a href="#cb20-183" aria-hidden="true" tabindex="-1"></a>mean score. This is reproducible and defensible.</span>
+<span id="cb20-184"><a href="#cb20-184" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-187"><a href="#cb20-187" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-188"><a href="#cb20-188" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: annotate</span></span>
+<span id="cb20-189"><a href="#cb20-189" aria-hidden="true" tabindex="-1"></a>marker_sets <span class="op">=</span> {</span>
+<span id="cb20-190"><a href="#cb20-190" aria-hidden="true" tabindex="-1"></a>    <span class="st">"CD4 T"</span>:        [<span class="st">"IL7R"</span>, <span class="st">"CD3D"</span>, <span class="st">"CD3E"</span>, <span class="st">"CCR7"</span>],</span>
+<span id="cb20-191"><a href="#cb20-191" aria-hidden="true" tabindex="-1"></a>    <span class="st">"CD8 T"</span>:        [<span class="st">"CD8A"</span>, <span class="st">"CD8B"</span>, <span class="st">"CD3D"</span>],</span>
+<span id="cb20-192"><a href="#cb20-192" aria-hidden="true" tabindex="-1"></a>    <span class="st">"B"</span>:            [<span class="st">"MS4A1"</span>, <span class="st">"CD79A"</span>, <span class="st">"CD79B"</span>],</span>
+<span id="cb20-193"><a href="#cb20-193" aria-hidden="true" tabindex="-1"></a>    <span class="st">"NK"</span>:           [<span class="st">"GNLY"</span>, <span class="st">"NKG7"</span>, <span class="st">"KLRD1"</span>],</span>
+<span id="cb20-194"><a href="#cb20-194" aria-hidden="true" tabindex="-1"></a>    <span class="st">"CD14+ Mono"</span>:   [<span class="st">"CD14"</span>, <span class="st">"LYZ"</span>, <span class="st">"S100A8"</span>],</span>
+<span id="cb20-195"><a href="#cb20-195" aria-hidden="true" tabindex="-1"></a>    <span class="st">"FCGR3A+ Mono"</span>: [<span class="st">"FCGR3A"</span>, <span class="st">"MS4A7"</span>],</span>
+<span id="cb20-196"><a href="#cb20-196" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Dendritic"</span>:    [<span class="st">"FCER1A"</span>, <span class="st">"CST3"</span>],</span>
+<span id="cb20-197"><a href="#cb20-197" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Megakaryocyte"</span>:[<span class="st">"PPBP"</span>, <span class="st">"PF4"</span>],</span>
+<span id="cb20-198"><a href="#cb20-198" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb20-199"><a href="#cb20-199" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> ct, genes <span class="kw">in</span> marker_sets.items():</span>
+<span id="cb20-200"><a href="#cb20-200" aria-hidden="true" tabindex="-1"></a>    present <span class="op">=</span> [g <span class="cf">for</span> g <span class="kw">in</span> genes <span class="cf">if</span> g <span class="kw">in</span> adata.raw.var_names]</span>
+<span id="cb20-201"><a href="#cb20-201" aria-hidden="true" tabindex="-1"></a>    sc.tl.score_genes(adata, present, score_name<span class="op">=</span><span class="ss">f"score_</span><span class="sc">{</span>ct<span class="sc">}</span><span class="ss">"</span>, use_raw<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb20-202"><a href="#cb20-202" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-203"><a href="#cb20-203" aria-hidden="true" tabindex="-1"></a>score_cols <span class="op">=</span> [<span class="ss">f"score_</span><span class="sc">{</span>ct<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> ct <span class="kw">in</span> marker_sets]</span>
+<span id="cb20-204"><a href="#cb20-204" aria-hidden="true" tabindex="-1"></a>cluster_scores <span class="op">=</span> adata.obs.groupby(<span class="st">"leiden"</span>, observed<span class="op">=</span><span class="va">True</span>)[score_cols].mean()</span>
+<span id="cb20-205"><a href="#cb20-205" aria-hidden="true" tabindex="-1"></a>assignment <span class="op">=</span> cluster_scores.idxmax(axis<span class="op">=</span><span class="dv">1</span>).<span class="bu">str</span>.replace(<span class="st">"score_"</span>, <span class="st">""</span>, regex<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-206"><a href="#cb20-206" aria-hidden="true" tabindex="-1"></a>adata.obs[<span class="st">"cell_type"</span>] <span class="op">=</span> adata.obs[<span class="st">"leiden"</span>].<span class="bu">map</span>(assignment).astype(<span class="st">"category"</span>)</span>
+<span id="cb20-207"><a href="#cb20-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-208"><a href="#cb20-208" aria-hidden="true" tabindex="-1"></a>summary <span class="op">=</span> (adata.obs[<span class="st">"cell_type"</span>].value_counts()</span>
+<span id="cb20-209"><a href="#cb20-209" aria-hidden="true" tabindex="-1"></a>           .rename_axis(<span class="st">"cell_type"</span>).reset_index(name<span class="op">=</span><span class="st">"n_cells"</span>))</span>
+<span id="cb20-210"><a href="#cb20-210" aria-hidden="true" tabindex="-1"></a>summary[<span class="st">"pct"</span>] <span class="op">=</span> (<span class="dv">100</span> <span class="op">*</span> summary[<span class="st">"n_cells"</span>] <span class="op">/</span> summary[<span class="st">"n_cells"</span>].<span class="bu">sum</span>()).<span class="bu">round</span>(<span class="dv">1</span>)</span>
+<span id="cb20-211"><a href="#cb20-211" aria-hidden="true" tabindex="-1"></a>summary.to_csv(<span class="st">"results/celltype_composition.csv"</span>, index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-212"><a href="#cb20-212" aria-hidden="true" tabindex="-1"></a>summary</span>
+<span id="cb20-213"><a href="#cb20-213" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-214"><a href="#cb20-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-217"><a href="#cb20-217" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-218"><a href="#cb20-218" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-dotplot</span></span>
+<span id="cb20-219"><a href="#cb20-219" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Marker expression by annotated cell type — the validation that labels are correct."</span></span>
+<span id="cb20-220"><a href="#cb20-220" aria-hidden="true" tabindex="-1"></a>ordered_markers <span class="op">=</span> {ct: [g <span class="cf">for</span> g <span class="kw">in</span> gs <span class="cf">if</span> g <span class="kw">in</span> adata.raw.var_names]</span>
+<span id="cb20-221"><a href="#cb20-221" aria-hidden="true" tabindex="-1"></a>                   <span class="cf">for</span> ct, gs <span class="kw">in</span> marker_sets.items()}</span>
+<span id="cb20-222"><a href="#cb20-222" aria-hidden="true" tabindex="-1"></a>sc.pl.dotplot(adata, ordered_markers, groupby<span class="op">=</span><span class="st">"cell_type"</span>, use_raw<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb20-223"><a href="#cb20-223" aria-hidden="true" tabindex="-1"></a>              standard_scale<span class="op">=</span><span class="st">"var"</span>, show<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-224"><a href="#cb20-224" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb20-225"><a href="#cb20-225" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-226"><a href="#cb20-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-229"><a href="#cb20-229" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-230"><a href="#cb20-230" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-umap-annotated</span></span>
+<span id="cb20-231"><a href="#cb20-231" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "**The headline figure**: UMAP coloured by annotated cell type."</span></span>
+<span id="cb20-232"><a href="#cb20-232" aria-hidden="true" tabindex="-1"></a>sc.pl.umap(adata, color<span class="op">=</span><span class="st">"cell_type"</span>, legend_loc<span class="op">=</span><span class="st">"right margin"</span>,</span>
+<span id="cb20-233"><a href="#cb20-233" aria-hidden="true" tabindex="-1"></a>           title<span class="op">=</span><span class="st">"Annotated PBMC cell types"</span>, show<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb20-234"><a href="#cb20-234" aria-hidden="true" tabindex="-1"></a>plt.show()</span>
+<span id="cb20-235"><a href="#cb20-235" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-236"><a href="#cb20-236" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-237"><a href="#cb20-237" aria-hidden="true" tabindex="-1"></a><span class="fu">## 7 · Interactive explorer</span></span>
+<span id="cb20-238"><a href="#cb20-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-239"><a href="#cb20-239" aria-hidden="true" tabindex="-1"></a>Static figures are for the paper; an interactive view is for *exploration*. Hover any</span>
+<span id="cb20-240"><a href="#cb20-240" aria-hidden="true" tabindex="-1"></a>cell to read its cluster, type, and depth. (Try the box/lasso select and legend toggles.)</span>
+<span id="cb20-241"><a href="#cb20-241" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-244"><a href="#cb20-244" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-245"><a href="#cb20-245" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: fig-plotly</span></span>
+<span id="cb20-246"><a href="#cb20-246" aria-hidden="true" tabindex="-1"></a><span class="co">#| fig-cap: "Interactive UMAP — hover, zoom, and toggle cell types."</span></span>
+<span id="cb20-247"><a href="#cb20-247" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> plotly.express <span class="im">as</span> px</span>
+<span id="cb20-248"><a href="#cb20-248" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb20-249"><a href="#cb20-249" aria-hidden="true" tabindex="-1"></a>    <span class="st">"UMAP1"</span>: adata.obsm[<span class="st">"X_umap"</span>][:, <span class="dv">0</span>],</span>
+<span id="cb20-250"><a href="#cb20-250" aria-hidden="true" tabindex="-1"></a>    <span class="st">"UMAP2"</span>: adata.obsm[<span class="st">"X_umap"</span>][:, <span class="dv">1</span>],</span>
+<span id="cb20-251"><a href="#cb20-251" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cell_type"</span>: adata.obs[<span class="st">"cell_type"</span>].astype(<span class="bu">str</span>).values,</span>
+<span id="cb20-252"><a href="#cb20-252" aria-hidden="true" tabindex="-1"></a>    <span class="st">"leiden"</span>: adata.obs[<span class="st">"leiden"</span>].astype(<span class="bu">str</span>).values,</span>
+<span id="cb20-253"><a href="#cb20-253" aria-hidden="true" tabindex="-1"></a>    <span class="st">"n_genes"</span>: adata.obs[<span class="st">"n_genes_by_counts"</span>].values,</span>
+<span id="cb20-254"><a href="#cb20-254" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb20-255"><a href="#cb20-255" aria-hidden="true" tabindex="-1"></a>fig <span class="op">=</span> px.scatter(</span>
+<span id="cb20-256"><a href="#cb20-256" aria-hidden="true" tabindex="-1"></a>    df, x<span class="op">=</span><span class="st">"UMAP1"</span>, y<span class="op">=</span><span class="st">"UMAP2"</span>, color<span class="op">=</span><span class="st">"cell_type"</span>,</span>
+<span id="cb20-257"><a href="#cb20-257" aria-hidden="true" tabindex="-1"></a>    hover_data<span class="op">=</span>[<span class="st">"leiden"</span>, <span class="st">"n_genes"</span>],</span>
+<span id="cb20-258"><a href="#cb20-258" aria-hidden="true" tabindex="-1"></a>    title<span class="op">=</span><span class="st">"3k PBMCs — interactive UMAP"</span>,</span>
+<span id="cb20-259"><a href="#cb20-259" aria-hidden="true" tabindex="-1"></a>    width<span class="op">=</span><span class="dv">820</span>, height<span class="op">=</span><span class="dv">600</span>, opacity<span class="op">=</span><span class="fl">0.8</span>,</span>
+<span id="cb20-260"><a href="#cb20-260" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb20-261"><a href="#cb20-261" aria-hidden="true" tabindex="-1"></a>fig.update_traces(marker<span class="op">=</span><span class="bu">dict</span>(size<span class="op">=</span><span class="dv">4</span>))</span>
+<span id="cb20-262"><a href="#cb20-262" aria-hidden="true" tabindex="-1"></a>fig.update_layout(legend_title_text<span class="op">=</span><span class="st">"Cell type"</span>, template<span class="op">=</span><span class="st">"plotly_white"</span>)</span>
+<span id="cb20-263"><a href="#cb20-263" aria-hidden="true" tabindex="-1"></a>fig.show()</span>
+<span id="cb20-264"><a href="#cb20-264" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-265"><a href="#cb20-265" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-266"><a href="#cb20-266" aria-hidden="true" tabindex="-1"></a><span class="fu">## 8 · Interpretation &amp; caveats</span></span>
+<span id="cb20-267"><a href="#cb20-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-268"><a href="#cb20-268" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb20-269"><a href="#cb20-269" aria-hidden="true" tabindex="-1"></a><span class="fu">## What this means — and what I would *not* conclude</span></span>
+<span id="cb20-270"><a href="#cb20-270" aria-hidden="true" tabindex="-1"></a>The pipeline cleanly resolves seven canonical PBMC populations — CD4 T cells, both monocyte</span>
+<span id="cb20-271"><a href="#cb20-271" aria-hidden="true" tabindex="-1"></a>subsets (classical CD14+ and non-classical FCGR3A+), B cells, NK cells, dendritic cells, and a</span>
+<span id="cb20-272"><a href="#cb20-272" aria-hidden="true" tabindex="-1"></a>small megakaryocyte/platelet cluster — each supported by textbook markers in the dot-plot.</span>
+<span id="cb20-273"><a href="#cb20-273" aria-hidden="true" tabindex="-1"></a>CD8 T cells sit adjacent to CD4 T cells and are *not* split at this depth — an honest limitation</span>
+<span id="cb20-274"><a href="#cb20-274" aria-hidden="true" tabindex="-1"></a>of a shallow 3k dataset, flagged rather than papered over. That internal consistency is the real</span>
+<span id="cb20-275"><a href="#cb20-275" aria-hidden="true" tabindex="-1"></a>quality signal: the clusters are *biologically interpretable*, not just statistically distinct.</span>
+<span id="cb20-276"><a href="#cb20-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-277"><a href="#cb20-277" aria-hidden="true" tabindex="-1"></a>**Caveats a careful analyst flags:** (1) cluster boundaries depend on the Leiden *resolution* —</span>
+<span id="cb20-278"><a href="#cb20-278" aria-hidden="true" tabindex="-1"></a>1.0 here separates seven lineages but leaves CD8 T adjacent to CD4 T; lowering it further merges</span>
+<span id="cb20-279"><a href="#cb20-279" aria-hidden="true" tabindex="-1"></a>the non-classical monocytes into NK, while raising it can split CD8 out at the cost of stability</span>
+<span id="cb20-280"><a href="#cb20-280" aria-hidden="true" tabindex="-1"></a>and spurious clusters — so resolution should be chosen against the biological question, not by default.</span>
+<span id="cb20-281"><a href="#cb20-281" aria-hidden="true" tabindex="-1"></a>(2) Marker-score annotation labels a cluster by its *best* match — rare or transitional states can</span>
+<span id="cb20-282"><a href="#cb20-282" aria-hidden="true" tabindex="-1"></a>be absorbed into a neighbour; reference-based tools (e.g. CellTypist) are the next step when labels</span>
+<span id="cb20-283"><a href="#cb20-283" aria-hidden="true" tabindex="-1"></a>must be defensible. (3) This is a single healthy donor: no batch, no condition, so no</span>
+<span id="cb20-284"><a href="#cb20-284" aria-hidden="true" tabindex="-1"></a>differential abundance/expression claims are made here. (4) Doublets were handled only via the</span>
+<span id="cb20-285"><a href="#cb20-285" aria-hidden="true" tabindex="-1"></a>upper gene-count filter; a dedicated detector (Scrublet) is warranted on real multi-sample data.</span>
+<span id="cb20-286"><a href="#cb20-286" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-287"><a href="#cb20-287" aria-hidden="true" tabindex="-1"></a>**What I'd do with your data:** confirm the biological question first (atlas vs comparison),</span>
+<span id="cb20-288"><a href="#cb20-288" aria-hidden="true" tabindex="-1"></a>tune QC/resolution to it, add doublet detection and — for multi-sample designs — integration</span>
+<span id="cb20-289"><a href="#cb20-289" aria-hidden="true" tabindex="-1"></a>(Harmony/scVI) before any cross-condition comparison.</span>
+<span id="cb20-290"><a href="#cb20-290" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb20-291"><a href="#cb20-291" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-292"><a href="#cb20-292" aria-hidden="true" tabindex="-1"></a><span class="fu">## 9 · Result</span></span>
+<span id="cb20-293"><a href="#cb20-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-296"><a href="#cb20-296" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-297"><a href="#cb20-297" aria-hidden="true" tabindex="-1"></a><span class="co">#| label: save</span></span>
+<span id="cb20-298"><a href="#cb20-298" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb20-299"><a href="#cb20-299" aria-hidden="true" tabindex="-1"></a>adata.write(<span class="st">"results/pbmc3k_annotated.h5ad"</span>)</span>
+<span id="cb20-300"><a href="#cb20-300" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> Markdown</span>
+<span id="cb20-301"><a href="#cb20-301" aria-hidden="true" tabindex="-1"></a>n_types <span class="op">=</span> adata.obs[<span class="st">"cell_type"</span>].nunique()</span>
+<span id="cb20-302"><a href="#cb20-302" aria-hidden="true" tabindex="-1"></a>Markdown(<span class="ss">f"Starting from a raw 10x matrix, the pipeline resolved **</span><span class="sc">{</span>adata<span class="sc">.</span>n_obs<span class="sc">:,}</span><span class="ss"> "</span></span>
+<span id="cb20-303"><a href="#cb20-303" aria-hidden="true" tabindex="-1"></a>         <span class="ss">f"quality-controlled cells** into **</span><span class="sc">{</span>adata<span class="sc">.</span>obs<span class="sc">.</span>leiden<span class="sc">.</span>nunique()<span class="sc">}</span><span class="ss"> clusters** "</span></span>
+<span id="cb20-304"><a href="#cb20-304" aria-hidden="true" tabindex="-1"></a>         <span class="ss">f"spanning **</span><span class="sc">{</span>n_types<span class="sc">}</span><span class="ss"> recognisable PBMC cell types**, each validated by "</span></span>
+<span id="cb20-305"><a href="#cb20-305" aria-hidden="true" tabindex="-1"></a>         <span class="ss">f"canonical markers. Outputs (annotated `.h5ad`, marker tables, composition) "</span></span>
+<span id="cb20-306"><a href="#cb20-306" aria-hidden="true" tabindex="-1"></a>         <span class="ss">f"are written to `results/`."</span>)</span>
+<span id="cb20-307"><a href="#cb20-307" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-308"><a href="#cb20-308" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-309"><a href="#cb20-309" aria-hidden="true" tabindex="-1"></a>**What a client gets:** an annotated object ready for downstream work, a composition</span>
+<span id="cb20-310"><a href="#cb20-310" aria-hidden="true" tabindex="-1"></a>table, publication-quality figures, an interactive explorer, and this fully</span>
+<span id="cb20-311"><a href="#cb20-311" aria-hidden="true" tabindex="-1"></a>reproducible report. **What stays mine:** the parametrised, batch-capable version that</span>
+<span id="cb20-312"><a href="#cb20-312" aria-hidden="true" tabindex="-1"></a>runs this on *your* data with automated QC tuning — that lives in a private engine.</span>
+<span id="cb20-313"><a href="#cb20-313" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-314"><a href="#cb20-314" aria-hidden="true" tabindex="-1"></a>---</span>
+<span id="cb20-315"><a href="#cb20-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-316"><a href="#cb20-316" aria-hidden="true" tabindex="-1"></a>::: {.callout-tip collapse="true"}</span>
+<span id="cb20-317"><a href="#cb20-317" aria-hidden="true" tabindex="-1"></a><span class="fu">## Session info</span></span>
+<span id="cb20-320"><a href="#cb20-320" aria-hidden="true" tabindex="-1"></a><span class="in">```{python}</span></span>
+<span id="cb20-321"><a href="#cb20-321" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false</span></span>
+<span id="cb20-322"><a href="#cb20-322" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
+<span id="cb20-323"><a href="#cb20-323" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Python"</span>, sys.version.split()[<span class="dv">0</span>])</span>
+<span id="cb20-324"><a href="#cb20-324" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> m <span class="kw">in</span> [<span class="st">"scanpy"</span>, <span class="st">"anndata"</span>, <span class="st">"numpy"</span>, <span class="st">"pandas"</span>, <span class="st">"plotly"</span>, <span class="st">"leidenalg"</span>]:</span>
+<span id="cb20-325"><a href="#cb20-325" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
+<span id="cb20-326"><a href="#cb20-326" aria-hidden="true" tabindex="-1"></a>        <span class="im">import</span> importlib.metadata <span class="im">as</span> im</span>
+<span id="cb20-327"><a href="#cb20-327" aria-hidden="true" tabindex="-1"></a>        <span class="bu">print</span>(<span class="ss">f"</span><span class="sc">{</span>m<span class="sc">:12s}</span><span class="ss"> </span><span class="sc">{</span>im<span class="sc">.</span>version(m)<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb20-328"><a href="#cb20-328" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb20-329"><a href="#cb20-329" aria-hidden="true" tabindex="-1"></a>        <span class="cf">pass</span></span>
+<span id="cb20-330"><a href="#cb20-330" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb20-331"><a href="#cb20-331" aria-hidden="true" tabindex="-1"></a>:::</span>
+</code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+<script src="index_files/libs/quarto-html/zenscroll-min.js"></script>
+</body></html>

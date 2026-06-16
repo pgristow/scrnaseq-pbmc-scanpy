@@ -1,0 +1,37 @@
+name: Reproduce
+
+# Re-runs the FULL pipeline on the tiny public dataset on every push.
+# A green badge is third-party proof the analysis actually reproduces from a clean clone.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up conda environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      - name: Download data
+        shell: bash -el {0}
+        run: bash scripts/download_data.sh
+
+      - name: Render report (executes the whole pipeline)
+        shell: bash -el {0}
+        run: quarto render
+
+      - name: Smoke-test outputs
+        shell: bash -el {0}
+        run: |
+          test -f docs/index.html
+          test -f results/celltype_composition.csv
+          test -f results/top_markers_per_cluster.csv
+          echo "Pipeline reproduced successfully from a clean clone."
